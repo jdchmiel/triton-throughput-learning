@@ -1,0 +1,3 @@
+# Dependencies for ramp-up.py (and benchy.py)
+aiohttp>=3.9
+matplotlib>=3.7
