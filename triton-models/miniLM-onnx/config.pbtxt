@@ -1,0 +1,44 @@
+name: "miniLM-onnx"
+backend: "onnxruntime"
+max_batch_size: 128
+
+# Enable dynamic batching with a maximum collection delay window
+dynamic_batching {
+  preferred_batch_size: [ 2, 4, 8, 16, 24, 32, 48, 64, 96, 128 ]
+  max_queue_delay_microseconds: 5000
+}
+
+# Assign high priority (1) across the GPU instance execution pipeline
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+    rate_limiter {
+      priority: 1
+    }
+  }
+]
+input [
+  {
+    name: "input_ids"
+    data_type: TYPE_INT64
+    dims: [ -1 ]
+  },
+  {
+    name: "attention_mask"
+    data_type: TYPE_INT64
+    dims: [ -1 ]
+  },
+  {
+    name: "token_type_ids"
+    data_type: TYPE_INT64
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "last_hidden_state"
+    data_type: TYPE_FP32
+    dims: [ -1, 384 ]
+  }
+]
