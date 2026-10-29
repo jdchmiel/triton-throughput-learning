@@ -77,6 +77,17 @@ Never delete a folder, including failures.
 6. **Stats are cumulative since load and cannot be reset.** Always diff
    before/after. They are also written *after* the response returns, so the
    "after" snapshot must settle before it is read.
+7. **`preferred_batch_size` entries must all be <= `max_batch_size`.** Triton
+   refuses to load a config that breaks this, so lowering `max_batch_size` on
+   its own produces an unloadable config — the preference list has to be
+   truncated in the same mutation. `apply_variant` calls `normalize_config` to
+   do this, and `validate_config` rejects anything still illegal *before* the
+   server is touched. This matters more than it looks: the load API reports
+   every config rejection as the same opaque
+   `HTTP 500 failed to load 'X', failed to poll from model repository`, and the
+   real reason only appears in the server log (`docker logs <ctr> | grep
+   "Poll failed"`). Never conclude from that HTTP message that the server is
+   broken — check the config first.
 
 ## Interpreting results
 
