@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "triton_throughput_tester",
+  "project_id": "4a919757-fd14-4410-a6a5-e89a7a96d130"
+}
