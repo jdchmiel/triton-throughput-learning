@@ -7,5 +7,3 @@ __pycache__/
 *.db
 .beads-credential-key
 
-# Campaign run outputs (CSV/PNG/JSON) - reproducible artifacts, never tracked
-experiments/

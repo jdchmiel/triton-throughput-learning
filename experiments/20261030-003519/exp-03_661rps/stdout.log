@@ -1,0 +1,51 @@
+================ TRITON RAMP-UP LOAD TEST ================
+Target          : http://192.168.1.151:8000
+  endpoint      : miniLM-onnx (Priority 1) -> http://192.168.1.151:8000/v2/models/miniLM-onnx/infer
+Ramp            : 1 -> 60 connections/endpoint, +5 per stage
+Stages          : 15 x 8.0s (+1.0s warmup each)
+Early stop      : failure rate >= 10%, or aggregate gain < 2% for 2 stages
+Server stats    : on
+Single endpoint : onnx
+Label           : mbs8 (2b8a3bf626bb)
+==========================================================
+
+[stage   1]    1 conn/endpoint | aggregate   102.6 rps | failures   0.0% | avg batch 1.00
+[stage   2]    6 conn/endpoint | aggregate   616.1 rps | failures   0.0% | avg batch 4.00
+[stage   3]    8 conn/endpoint | aggregate   622.1 rps | failures   0.0% | avg batch 4.00
+[stage   4]   11 conn/endpoint | aggregate   652.2 rps | failures   0.0% | avg batch 7.97
+[stage   5]   16 conn/endpoint | aggregate   650.4 rps | failures   0.0% | avg batch 7.98
+[stage   6]   21 conn/endpoint | aggregate   660.6 rps | failures   0.0% | avg batch 7.97
+
+Workers | Endpoint                   |     OK |  Fail |  Fail% |      RPS |  Mean ms |   p50 ms |   p95 ms |   p99 ms |  AvgBS
+------------------------------------------------------------------------------------------------------------------------------
+      1 | miniLM-onnx (Priority 1)   |    821 |     0 |   0.0% |    102.6 |      9.7 |      9.8 |     10.3 |     10.6 |   1.00
+      1 | AGGREGATE                  |        |       |        |    102.6
+------------------------------------------------------------------------------------------------------------------------------
+      6 | miniLM-onnx (Priority 1)   |   4929 |     0 |   0.0% |    616.1 |      9.7 |      9.8 |     10.4 |     10.8 |   4.00
+      6 | AGGREGATE                  |        |       |        |    616.1
+------------------------------------------------------------------------------------------------------------------------------
+      8 | miniLM-onnx (Priority 1)   |   4977 |     0 |   0.0% |    622.1 |     12.8 |     12.8 |     13.2 |     13.5 |   4.00
+      8 | AGGREGATE                  |        |       |        |    622.1
+------------------------------------------------------------------------------------------------------------------------------
+     11 | miniLM-onnx (Priority 1)   |   5218 |     0 |   0.0% |    652.2 |     16.8 |     16.7 |     17.7 |     18.0 |   7.97
+     11 | AGGREGATE                  |        |       |        |    652.2
+------------------------------------------------------------------------------------------------------------------------------
+     16 | miniLM-onnx (Priority 1)   |   5203 |     0 |   0.0% |    650.4 |     24.5 |     24.6 |     25.0 |     25.5 |   7.98
+     16 | AGGREGATE                  |        |       |        |    650.4
+------------------------------------------------------------------------------------------------------------------------------
+     21 | miniLM-onnx (Priority 1)   |   5285 |     0 |   0.0% |    660.6 |     31.7 |     31.8 |     32.8 |     33.1 |   7.97
+     21 | AGGREGATE                  |        |       |        |    660.6
+------------------------------------------------------------------------------------------------------------------------------
+
+Ramp finished in 69.2s after 6 stage(s).
+Stop reason: aggregate throughput stopped improving (<2% for 2 consecutive stages) at 21 connections/endpoint
+Peak aggregate throughput: 660.6 rps at 21 connections/endpoint
+
+CSV  : experiments/20261030-003519/exp-03_pending/ramp-results.csv
+PNG  : experiments/20261030-003519/exp-03_pending/ramp-throughput.png
+PNG  : experiments/20261030-003519/exp-03_pending/ramp-latency.png
+PNG  : experiments/20261030-003519/exp-03_pending/ramp-errors.png
+PNG  : experiments/20261030-003519/exp-03_pending/ramp-batch-size.png
+PNG  : experiments/20261030-003519/exp-03_pending/ramp-summary.png
+JSON : experiments/20261030-003519/exp-03_pending/run.json
+STATS: experiments/20261030-003519/exp-03_pending/stats.deltas.json

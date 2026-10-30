@@ -1,0 +1,71 @@
+================ TRITON RAMP-UP LOAD TEST ================
+Target          : http://192.168.1.151:8000
+  endpoint      : miniLM-onnx (Priority 1) -> http://192.168.1.151:8000/v2/models/miniLM-onnx/infer
+Ramp            : 1 -> 60 connections/endpoint, +5 per stage
+Stages          : 15 x 8.0s (+1.0s warmup each)
+Early stop      : failure rate >= 10%, or aggregate gain < 2% for 2 stages
+Server stats    : on
+Single endpoint : onnx
+Label           : baseline (1de89c2d4db3)
+==========================================================
+
+[stage   1]    1 conn/endpoint | aggregate    67.6 rps | failures   0.0% | avg batch 1.00
+[stage   2]    6 conn/endpoint | aggregate    84.5 rps | failures   0.0% | avg batch 1.92
+[stage   3]    8 conn/endpoint | aggregate   462.8 rps | failures   0.0% | avg batch 2.74
+[stage   4]   11 conn/endpoint | aggregate   198.5 rps | failures   0.0% | avg batch 2.77
+[stage   5]   16 conn/endpoint | aggregate   427.2 rps | failures   0.0% | avg batch 3.68
+[stage   6]   21 conn/endpoint | aggregate   521.9 rps | failures   0.0% | avg batch 4.24
+[stage   7]   26 conn/endpoint | aggregate   630.2 rps | failures   0.0% | avg batch 9.94
+[stage   8]   31 conn/endpoint | aggregate   580.2 rps | failures   0.0% | avg batch 8.46
+[stage   9]   32 conn/endpoint | aggregate   644.9 rps | failures   0.0% | avg batch 12.48
+[stage  10]   36 conn/endpoint | aggregate   650.8 rps | failures   0.0% | avg batch 14.66
+[stage  11]   41 conn/endpoint | aggregate   626.5 rps | failures   0.0% | avg batch 11.46
+
+Workers | Endpoint                   |     OK |  Fail |  Fail% |      RPS |  Mean ms |   p50 ms |   p95 ms |   p99 ms |  AvgBS
+------------------------------------------------------------------------------------------------------------------------------
+      1 | miniLM-onnx (Priority 1)   |    541 |     0 |   0.0% |     67.6 |     14.7 |     11.8 |     23.0 |     55.1 |   1.00
+      1 | AGGREGATE                  |        |       |        |     67.6
+------------------------------------------------------------------------------------------------------------------------------
+      6 | miniLM-onnx (Priority 1)   |    676 |     0 |   0.0% |     84.5 |     59.3 |     18.4 |    218.8 |    536.1 |   1.92
+      6 | AGGREGATE                  |        |       |        |     84.5
+------------------------------------------------------------------------------------------------------------------------------
+      8 | miniLM-onnx (Priority 1)   |   3702 |     0 |   0.0% |    462.8 |     17.2 |     14.9 |     30.9 |     59.8 |   2.74
+      8 | AGGREGATE                  |        |       |        |    462.8
+------------------------------------------------------------------------------------------------------------------------------
+     11 | miniLM-onnx (Priority 1)   |   1588 |     0 |   0.0% |    198.5 |     55.5 |     23.8 |    211.8 |    622.7 |   2.77
+     11 | AGGREGATE                  |        |       |        |    198.5
+------------------------------------------------------------------------------------------------------------------------------
+     16 | miniLM-onnx (Priority 1)   |   3418 |     0 |   0.0% |    427.2 |     37.3 |     30.2 |     80.2 |    138.6 |   3.68
+     16 | AGGREGATE                  |        |       |        |    427.2
+------------------------------------------------------------------------------------------------------------------------------
+     21 | miniLM-onnx (Priority 1)   |   4175 |     0 |   0.0% |    521.9 |     40.3 |     37.6 |     64.7 |     93.5 |   4.24
+     21 | AGGREGATE                  |        |       |        |    521.9
+------------------------------------------------------------------------------------------------------------------------------
+     26 | miniLM-onnx (Priority 1)   |   5042 |     0 |   0.0% |    630.2 |     41.2 |     38.8 |     65.6 |     80.3 |   9.94
+     26 | AGGREGATE                  |        |       |        |    630.2
+------------------------------------------------------------------------------------------------------------------------------
+     31 | miniLM-onnx (Priority 1)   |   4642 |     0 |   0.0% |    580.2 |     53.3 |     46.5 |     97.7 |    137.6 |   8.46
+     31 | AGGREGATE                  |        |       |        |    580.2
+------------------------------------------------------------------------------------------------------------------------------
+     32 | miniLM-onnx (Priority 1)   |   5159 |     0 |   0.0% |    644.9 |     49.6 |     47.0 |     74.2 |    104.2 |  12.48
+     32 | AGGREGATE                  |        |       |        |    644.9
+------------------------------------------------------------------------------------------------------------------------------
+     36 | miniLM-onnx (Priority 1)   |   5206 |     0 |   0.0% |    650.8 |     55.2 |     53.1 |     76.0 |     91.6 |  14.66
+     36 | AGGREGATE                  |        |       |        |    650.8
+------------------------------------------------------------------------------------------------------------------------------
+     41 | miniLM-onnx (Priority 1)   |   5012 |     0 |   0.0% |    626.5 |     65.4 |     59.3 |    101.4 |    142.1 |  11.46
+     41 | AGGREGATE                  |        |       |        |    626.5
+------------------------------------------------------------------------------------------------------------------------------
+
+Ramp finished in 128.0s after 11 stage(s).
+Stop reason: aggregate throughput stopped improving (<2% for 2 consecutive stages) at 41 connections/endpoint
+Peak aggregate throughput: 650.8 rps at 36 connections/endpoint
+
+CSV  : experiments/20261029-233449/exp-01_pending/ramp-results.csv
+PNG  : experiments/20261029-233449/exp-01_pending/ramp-throughput.png
+PNG  : experiments/20261029-233449/exp-01_pending/ramp-latency.png
+PNG  : experiments/20261029-233449/exp-01_pending/ramp-errors.png
+PNG  : experiments/20261029-233449/exp-01_pending/ramp-batch-size.png
+PNG  : experiments/20261029-233449/exp-01_pending/ramp-summary.png
+JSON : experiments/20261029-233449/exp-01_pending/run.json
+STATS: experiments/20261029-233449/exp-01_pending/stats.deltas.json

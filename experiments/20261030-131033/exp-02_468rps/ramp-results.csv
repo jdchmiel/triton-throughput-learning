@@ -1,0 +1,9 @@
+workers,endpoint,duration_s,successes,failures,failure_rate,requests_per_second,mean_ms,p50_ms,p95_ms,p99_ms,max_ms,top_errors,triton_inference_count,triton_execution_count,avg_batch_size,queue_ns,compute_infer_ns,batch_distribution,client_cpu_pct,client_cores_pegged,client_net_MBps,client_net_util_pct,server_cpu_pct,server_cores_pegged,server_net_MBps,server_net_util_pct,server_vram_MiB,server_gpu_util_pct,bottleneck
+1,onnx,8.000,1987,0,0.0000,248.375,3.989,4.152,4.625,4.852,5.659,,2259,2259,1.000,71245716,1647198646,bs1=v2259,,,,,,,,,,,
+1,aggregate,,,,,248.375,,,,,,,,,,,,,3.9,0,5.073,3.9,4.5,0,4.839,3.7,812.0,17.0,
+6,onnx,8.000,3736,0,0.0000,467.000,12.811,12.799,13.120,13.480,14.125,,4181,4181,1.000,39359017021,2905702624,bs1=v4181,,,,,,,,,,,
+6,aggregate,,,,,467.000,,,,,,,,,,,,,5.1,0,9.538,7.4,7.8,2,9.153,7.1,812.0,30.0,
+8,onnx,8.000,3745,0,0.0000,468.125,17.034,17.045,17.295,17.584,19.203,,4198,4198,1.000,57364992875,2910114674,bs1=v4198,,,,,,,,,,,
+8,aggregate,,,,,468.125,,,,,,,,,,,,,5.0,0,9.575,7.4,7.9,1,9.185,7.1,812.0,30.5,server: 1/16 cores pinned >=95% for the whole stage
+11,onnx,8.000,3665,0,0.0000,458.125,23.943,23.979,24.432,25.082,26.665,,4119,4119,1.000,84357256146,2908850243,bs1=v4119,,,,,,,,,,,
+11,aggregate,,,,,458.125,,,,,,,,,,,,,5.1,0,9.375,7.2,7.8,1,8.988,6.9,812.0,29.5,

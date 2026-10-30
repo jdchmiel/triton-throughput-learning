@@ -1,0 +1,191 @@
+{
+  "schema_version": 1,
+  "label": "qd2000us (469238e86e7f)",
+  "started_at": "2026-10-30T13:26:48.019076+00:00",
+  "finished_at": "2026-10-30T13:28:10.092698+00:00",
+  "elapsed_seconds": 82.074,
+  "git_sha": "b3ca69e",
+  "run": {
+    "base_url": "http://192.168.1.151:8000",
+    "schedule": [
+      1,
+      6,
+      8,
+      11,
+      16,
+      21,
+      26
+    ],
+    "stage_duration_seconds": 8.0,
+    "warmup_seconds": 1.0,
+    "start_workers": 1,
+    "worker_increment": 5,
+    "max_workers": 60,
+    "thresholds": {
+      "plateau_threshold": 0.02,
+      "plateau_stages_required": 2,
+      "failure_stop_rate": 0.1,
+      "min_requests_per_stage": 20
+    }
+  },
+  "endpoints": [
+    {
+      "key": "onnx",
+      "model": "miniLM-onnx",
+      "url": "http://192.168.1.151:8000/v2/models/miniLM-onnx/infer",
+      "headers": {
+        "X-Amzn-SageMaker-Target-Model": "miniLM-onnx"
+      }
+    }
+  ],
+  "result": {
+    "stages_measured": 7,
+    "stop_reason": "aggregate throughput stopped improving (<2% for 2 consecutive stages) at 26 connections/endpoint",
+    "peak_aggregate_rps": 683.125,
+    "peak_workers": 26,
+    "rps_at_reference_concurrency": {
+      "8": 654.375,
+      "16": 673.375,
+      "32": null
+    },
+    "per_endpoint_peak": {
+      "onnx": {
+        "model": "miniLM-onnx",
+        "peak_rps": 683.125,
+        "workers": 26,
+        "p50_ms": 37.849,
+        "p99_ms": 39.7,
+        "avg_batch_size": 23.76356589147287
+      }
+    },
+    "system": {
+      "available": true,
+      "stages": [
+        {
+          "workers": 1,
+          "rps": 151.9,
+          "client_cpu_pct": 2.6,
+          "client_cores_pegged": 0,
+          "client_net_MBps": 3.097,
+          "client_net_util_pct": 2.4,
+          "server_cpu_pct": 3.2,
+          "server_cores_pegged": 0,
+          "server_net_MBps": 2.964,
+          "server_net_util_pct": 2.3,
+          "server_vram_MiB": 788.0,
+          "server_gpu_util_pct": 10.2,
+          "signals": []
+        },
+        {
+          "workers": 6,
+          "rps": 615.4,
+          "client_cpu_pct": 5.3,
+          "client_cores_pegged": 0,
+          "client_net_MBps": 12.577,
+          "client_net_util_pct": 9.7,
+          "server_cpu_pct": 8.2,
+          "server_cores_pegged": 2,
+          "server_net_MBps": 12.073,
+          "server_net_util_pct": 9.3,
+          "server_vram_MiB": 788.0,
+          "server_gpu_util_pct": 10.0,
+          "signals": []
+        },
+        {
+          "workers": 8,
+          "rps": 654.4,
+          "client_cpu_pct": 5.1,
+          "client_cores_pegged": 0,
+          "client_net_MBps": 13.36,
+          "client_net_util_pct": 10.3,
+          "server_cpu_pct": 8.3,
+          "server_cores_pegged": 1,
+          "server_net_MBps": 12.863,
+          "server_net_util_pct": 9.9,
+          "server_vram_MiB": 788.0,
+          "server_gpu_util_pct": 6.0,
+          "signals": [
+            "server: 1/16 cores pinned >=95% for the whole stage"
+          ]
+        },
+        {
+          "workers": 11,
+          "rps": 654.6,
+          "client_cpu_pct": 5.4,
+          "client_cores_pegged": 0,
+          "client_net_MBps": 13.364,
+          "client_net_util_pct": 10.3,
+          "server_cpu_pct": 8.4,
+          "server_cores_pegged": 1,
+          "server_net_MBps": 12.832,
+          "server_net_util_pct": 9.9,
+          "server_vram_MiB": 788.0,
+          "server_gpu_util_pct": 5.2,
+          "signals": []
+        },
+        {
+          "workers": 16,
+          "rps": 673.4,
+          "client_cpu_pct": 5.0,
+          "client_cores_pegged": 0,
+          "client_net_MBps": 13.719,
+          "client_net_util_pct": 10.6,
+          "server_cpu_pct": 8.1,
+          "server_cores_pegged": 1,
+          "server_net_MBps": 13.191,
+          "server_net_util_pct": 10.2,
+          "server_vram_MiB": 788.0,
+          "server_gpu_util_pct": 4.0,
+          "signals": []
+        },
+        {
+          "workers": 21,
+          "rps": 673.5,
+          "client_cpu_pct": 4.9,
+          "client_cores_pegged": 0,
+          "client_net_MBps": 13.754,
+          "client_net_util_pct": 10.6,
+          "server_cpu_pct": 8.2,
+          "server_cores_pegged": 0,
+          "server_net_MBps": 13.169,
+          "server_net_util_pct": 10.2,
+          "server_vram_MiB": 788.0,
+          "server_gpu_util_pct": 2.5,
+          "signals": []
+        },
+        {
+          "workers": 26,
+          "rps": 683.1,
+          "client_cpu_pct": 5.0,
+          "client_cores_pegged": 0,
+          "client_net_MBps": 13.954,
+          "client_net_util_pct": 10.8,
+          "server_cpu_pct": 8.3,
+          "server_cores_pegged": 1,
+          "server_net_MBps": 13.389,
+          "server_net_util_pct": 10.3,
+          "server_vram_MiB": 788.0,
+          "server_gpu_util_pct": 2.0,
+          "signals": []
+        }
+      ],
+      "any_saturated": true,
+      "stages_saturated": 1,
+      "peak_stage": {
+        "workers": 26,
+        "rps": 683.1,
+        "client_cpu_pct": 5.0,
+        "client_cores_pegged": 0,
+        "client_net_MBps": 13.954,
+        "client_net_util_pct": 10.8,
+        "server_cpu_pct": 8.3,
+        "server_cores_pegged": 1,
+        "server_net_MBps": 13.389,
+        "server_net_util_pct": 10.3,
+        "server_vram_MiB": 788.0,
+        "server_gpu_util_pct": 2.0,
+        "signals": []
+      }
+    }
+  }
+}

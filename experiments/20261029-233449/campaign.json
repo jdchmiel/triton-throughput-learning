@@ -1,0 +1,1051 @@
+{
+  "schema_version": 1,
+  "started_at": "2026-10-29T23:34:49.433586+00:00",
+  "finished_at": "2026-10-30T00:15:12.123540+00:00",
+  "elapsed_seconds": 2422.7,
+  "base_url": "http://192.168.1.151:8000",
+  "model": "miniLM-onnx",
+  "baseline_fingerprint": "1de89c2d4db3",
+  "baseline_config": {
+    "name": "miniLM-onnx",
+    "platform": "onnxruntime_onnx",
+    "backend": "onnxruntime",
+    "runtime": "",
+    "version_policy": {
+      "latest": {
+        "num_versions": 1
+      }
+    },
+    "max_batch_size": 128,
+    "input": [
+      {
+        "name": "input_ids",
+        "data_type": "TYPE_INT64",
+        "format": "FORMAT_NONE",
+        "dims": [
+          -1
+        ],
+        "is_shape_tensor": false,
+        "allow_ragged_batch": false,
+        "optional": false,
+        "is_non_linear_format_io": false
+      },
+      {
+        "name": "attention_mask",
+        "data_type": "TYPE_INT64",
+        "format": "FORMAT_NONE",
+        "dims": [
+          -1
+        ],
+        "is_shape_tensor": false,
+        "allow_ragged_batch": false,
+        "optional": false,
+        "is_non_linear_format_io": false
+      },
+      {
+        "name": "token_type_ids",
+        "data_type": "TYPE_INT64",
+        "format": "FORMAT_NONE",
+        "dims": [
+          -1
+        ],
+        "is_shape_tensor": false,
+        "allow_ragged_batch": false,
+        "optional": false,
+        "is_non_linear_format_io": false
+      }
+    ],
+    "output": [
+      {
+        "name": "last_hidden_state",
+        "data_type": "TYPE_FP32",
+        "dims": [
+          -1,
+          384
+        ],
+        "label_filename": "",
+        "is_shape_tensor": false,
+        "is_non_linear_format_io": false
+      }
+    ],
+    "batch_input": [],
+    "batch_output": [],
+    "optimization": {
+      "priority": "PRIORITY_DEFAULT",
+      "input_pinned_memory": {
+        "enable": true
+      },
+      "output_pinned_memory": {
+        "enable": true
+      },
+      "gather_kernel_buffer_threshold": 0,
+      "eager_batching": false
+    },
+    "dynamic_batching": {
+      "preferred_batch_size": [
+        2,
+        4,
+        8,
+        16,
+        24,
+        32,
+        48,
+        64,
+        96,
+        128
+      ],
+      "max_queue_delay_microseconds": 5000,
+      "preserve_ordering": false,
+      "priority_levels": 0,
+      "default_priority_level": 0,
+      "priority_queue_policy": {}
+    },
+    "instance_group": [
+      {
+        "name": "miniLM-onnx_0",
+        "kind": "KIND_GPU",
+        "count": 1,
+        "rate_limiter": {
+          "resources": [],
+          "priority": 1
+        },
+        "gpus": [
+          0
+        ],
+        "secondary_devices": [],
+        "profile": [],
+        "passive": false,
+        "host_policy": ""
+      }
+    ],
+    "default_model_filename": "model.onnx",
+    "cc_model_filenames": {},
+    "metric_tags": {},
+    "parameters": {},
+    "model_warmup": []
+  },
+  "ramp": {
+    "max_workers": 60,
+    "increment": 5,
+    "duration_seconds": 8.0,
+    "warmup_seconds": 1.0,
+    "endpoint": "onnx"
+  },
+  "limits": {
+    "max_experiments": 40,
+    "plateau_count": 6,
+    "max_failures": 4,
+    "budget_seconds": 10800,
+    "min_improvement": 0.02
+  },
+  "experiments_run": 25,
+  "stop_reason": "6 consecutive experiments failed to beat 2435.2 rps",
+  "best": {
+    "peak_rps": 2435.25,
+    "variant": "ic4",
+    "fingerprint": "32bb878f6e73"
+  },
+  "experiments": [
+    {
+      "number": 1,
+      "variant": "baseline",
+      "fingerprint": "1de89c2d4db3",
+      "peak_rps": 650.75,
+      "peak_workers": 36,
+      "avg_batch_size": 14.6625,
+      "rps_at_reference_concurrency": {
+        "8": 462.75,
+        "16": 427.25,
+        "32": 644.875
+      },
+      "status": "ok",
+      "verdict": "baseline",
+      "diff": {},
+      "folder": "exp-01_651rps"
+    },
+    {
+      "number": 2,
+      "variant": "mbs1",
+      "fingerprint": "69abe02e1630",
+      "peak_rps": 445.25,
+      "peak_workers": 32,
+      "avg_batch_size": 1.0,
+      "rps_at_reference_concurrency": {
+        "8": 71.25,
+        "16": 251.75,
+        "32": 445.25
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "max_batch_size": {
+          "from": 128,
+          "to": 1
+        },
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": null
+        }
+      },
+      "folder": "exp-02_445rps"
+    },
+    {
+      "number": 3,
+      "variant": "mbs8",
+      "fingerprint": "2b8a3bf626bb",
+      "peak_rps": 479.12,
+      "peak_workers": 8,
+      "avg_batch_size": 3.0414908579465543,
+      "rps_at_reference_concurrency": {
+        "8": 479.125,
+        "16": 260.625,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "max_batch_size": {
+          "from": 128,
+          "to": 8
+        },
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            2,
+            4,
+            8
+          ]
+        }
+      },
+      "folder": "exp-03_479rps"
+    },
+    {
+      "number": 4,
+      "variant": "mbs16",
+      "fingerprint": "60b702a3b2f6",
+      "peak_rps": 515.5,
+      "peak_workers": 11,
+      "avg_batch_size": 3.8744769874476988,
+      "rps_at_reference_concurrency": {
+        "8": 468.625,
+        "16": 481.875,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "max_batch_size": {
+          "from": 128,
+          "to": 16
+        },
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            2,
+            4,
+            8,
+            16
+          ]
+        }
+      },
+      "folder": "exp-04_516rps"
+    },
+    {
+      "number": 5,
+      "variant": "mbs32",
+      "fingerprint": "0bbcc34787b5",
+      "peak_rps": 619.62,
+      "peak_workers": 26,
+      "avg_batch_size": 8.604615384615384,
+      "rps_at_reference_concurrency": {
+        "8": 462.0,
+        "16": 592.75,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "max_batch_size": {
+          "from": 128,
+          "to": 32
+        },
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32
+          ]
+        }
+      },
+      "folder": "exp-05_620rps"
+    },
+    {
+      "number": 6,
+      "variant": "mbs64",
+      "fingerprint": "67de470585c7",
+      "peak_rps": 637.75,
+      "peak_workers": 32,
+      "avg_batch_size": 11.952282157676349,
+      "rps_at_reference_concurrency": {
+        "8": 495.875,
+        "16": 476.5,
+        "32": 637.75
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "max_batch_size": {
+          "from": 128,
+          "to": 64
+        },
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64
+          ]
+        }
+      },
+      "folder": "exp-06_638rps"
+    },
+    {
+      "number": 7,
+      "variant": "pbs:auto",
+      "fingerprint": "3d4562cbb641",
+      "peak_rps": 619.88,
+      "peak_workers": 60,
+      "avg_batch_size": 18.368078175895764,
+      "rps_at_reference_concurrency": {
+        "8": 346.375,
+        "16": 561.0,
+        "32": 512.25
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": null
+        }
+      },
+      "folder": "exp-07_620rps"
+    },
+    {
+      "number": 8,
+      "variant": "pbs:tiny",
+      "fingerprint": "4533e565260f",
+      "peak_rps": 596.5,
+      "peak_workers": 21,
+      "avg_batch_size": 5.646739130434782,
+      "rps_at_reference_concurrency": {
+        "8": 446.625,
+        "16": 563.375,
+        "32": 255.0
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            1,
+            2,
+            4,
+            8
+          ]
+        }
+      },
+      "folder": "exp-08_596rps"
+    },
+    {
+      "number": 9,
+      "variant": "pbs:small",
+      "fingerprint": "4d22ab943cf3",
+      "peak_rps": 159.0,
+      "peak_workers": 6,
+      "avg_batch_size": 1.9808219178082191,
+      "rps_at_reference_concurrency": {
+        "8": 116.5,
+        "16": null,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            2,
+            4,
+            8,
+            16
+          ]
+        }
+      },
+      "folder": "exp-09_159rps"
+    },
+    {
+      "number": 10,
+      "variant": "pbs:mid",
+      "fingerprint": "9db2d6c8daae",
+      "peak_rps": 674.12,
+      "peak_workers": 16,
+      "avg_batch_size": 14.290780141843971,
+      "rps_at_reference_concurrency": {
+        "8": 628.75,
+        "16": 674.125,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "IMPROVED",
+      "diff": {
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            8,
+            16,
+            32
+          ]
+        }
+      },
+      "folder": "exp-10_674rps"
+    },
+    {
+      "number": 11,
+      "variant": "pbs:wide",
+      "fingerprint": "4654323d7b3b",
+      "peak_rps": 668.0,
+      "peak_workers": 21,
+      "avg_batch_size": 16.428571428571427,
+      "rps_at_reference_concurrency": {
+        "8": 614.25,
+        "16": 666.125,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            4,
+            8,
+            16,
+            32,
+            64,
+            128
+          ]
+        }
+      },
+      "folder": "exp-11_668rps"
+    },
+    {
+      "number": 12,
+      "variant": "qd0us",
+      "fingerprint": "d82b02600e88",
+      "peak_rps": 541.75,
+      "peak_workers": 6,
+      "avg_batch_size": 1.9987659399424105,
+      "rps_at_reference_concurrency": {
+        "8": 541.125,
+        "16": null,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.max_queue_delay_microseconds": {
+          "from": 5000,
+          "to": 0
+        }
+      },
+      "folder": "exp-12_542rps"
+    },
+    {
+      "number": 13,
+      "variant": "qd500us",
+      "fingerprint": "0881984427cd",
+      "peak_rps": 663.25,
+      "peak_workers": 16,
+      "avg_batch_size": 14.84788029925187,
+      "rps_at_reference_concurrency": {
+        "8": 641.875,
+        "16": 663.25,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.max_queue_delay_microseconds": {
+          "from": 5000,
+          "to": 500
+        }
+      },
+      "folder": "exp-13_663rps"
+    },
+    {
+      "number": 14,
+      "variant": "qd2000us",
+      "fingerprint": "469238e86e7f",
+      "peak_rps": 679.25,
+      "peak_workers": 26,
+      "avg_batch_size": 23.670542635658915,
+      "rps_at_reference_concurrency": {
+        "8": 643.375,
+        "16": 678.5,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.max_queue_delay_microseconds": {
+          "from": 5000,
+          "to": 2000
+        }
+      },
+      "folder": "exp-14_679rps"
+    },
+    {
+      "number": 15,
+      "variant": "qd10000us",
+      "fingerprint": "747cdef1802f",
+      "peak_rps": 679.0,
+      "peak_workers": 31,
+      "avg_batch_size": 23.828125,
+      "rps_at_reference_concurrency": {
+        "8": 611.875,
+        "16": 644.75,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.max_queue_delay_microseconds": {
+          "from": 5000,
+          "to": 10000
+        }
+      },
+      "folder": "exp-15_679rps"
+    },
+    {
+      "number": 16,
+      "variant": "qd25000us",
+      "fingerprint": "fd3c1cb17070",
+      "peak_rps": 685.88,
+      "peak_workers": 31,
+      "avg_batch_size": 23.88372093023256,
+      "rps_at_reference_concurrency": {
+        "8": 614.25,
+        "16": 650.125,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.max_queue_delay_microseconds": {
+          "from": 5000,
+          "to": 25000
+        }
+      },
+      "folder": "exp-16_686rps"
+    },
+    {
+      "number": 17,
+      "variant": "ic2",
+      "fingerprint": "8cb75d490057",
+      "peak_rps": 1301.0,
+      "peak_workers": 32,
+      "avg_batch_size": 15.010309278350515,
+      "rps_at_reference_concurrency": {
+        "8": 1137.875,
+        "16": 1270.375,
+        "32": 1301.0
+      },
+      "status": "ok",
+      "verdict": "IMPROVED",
+      "diff": {
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              2,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-17_1301rps"
+    },
+    {
+      "number": 18,
+      "variant": "ic3",
+      "fingerprint": "bbfb9d56bac2",
+      "peak_rps": 1881.12,
+      "peak_workers": 31,
+      "avg_batch_size": 9.699942296595498,
+      "rps_at_reference_concurrency": {
+        "8": 1546.625,
+        "16": 1788.0,
+        "32": 1520.625
+      },
+      "status": "ok",
+      "verdict": "IMPROVED",
+      "diff": {
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              3,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-18_1881rps"
+    },
+    {
+      "number": 19,
+      "variant": "ic4",
+      "fingerprint": "32bb878f6e73",
+      "peak_rps": 2435.25,
+      "peak_workers": 32,
+      "avg_batch_size": 7.202577660277594,
+      "rps_at_reference_concurrency": {
+        "8": 1871.625,
+        "16": 2245.25,
+        "32": 2435.25
+      },
+      "status": "ok",
+      "verdict": "IMPROVED",
+      "diff": {
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              4,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-19_2435rps"
+    },
+    {
+      "number": 20,
+      "variant": "qd25000us_ic4",
+      "fingerprint": "0a167ecab385",
+      "peak_rps": 2422.62,
+      "peak_workers": 32,
+      "avg_batch_size": 7.231642189586115,
+      "rps_at_reference_concurrency": {
+        "8": 1858.875,
+        "16": 2233.125,
+        "32": 2422.625
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.max_queue_delay_microseconds": {
+          "from": 5000,
+          "to": 25000
+        },
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              4,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-20_2423rps"
+    },
+    {
+      "number": 21,
+      "variant": "mbs16_ic4",
+      "fingerprint": "0b2f66c54306",
+      "peak_rps": 2427.62,
+      "peak_workers": 31,
+      "avg_batch_size": 7.327278842919609,
+      "rps_at_reference_concurrency": {
+        "8": 1864.25,
+        "16": 2258.0,
+        "32": 2412.75
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "max_batch_size": {
+          "from": 128,
+          "to": 16
+        },
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            2,
+            4,
+            8,
+            16
+          ]
+        },
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              4,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-21_2428rps"
+    },
+    {
+      "number": 22,
+      "variant": "qd500us_ic4",
+      "fingerprint": "45552fc5b3ad",
+      "peak_rps": 2408.75,
+      "peak_workers": 32,
+      "avg_batch_size": 7.256815886906765,
+      "rps_at_reference_concurrency": {
+        "8": 1868.25,
+        "16": 2226.625,
+        "32": 2408.75
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.max_queue_delay_microseconds": {
+          "from": 5000,
+          "to": 500
+        },
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              4,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-22_2409rps"
+    },
+    {
+      "number": 23,
+      "variant": "mbs64_ic4",
+      "fingerprint": "47a99ff9f7b5",
+      "peak_rps": 2447.88,
+      "peak_workers": 32,
+      "avg_batch_size": 7.578092605390463,
+      "rps_at_reference_concurrency": {
+        "8": 1873.25,
+        "16": 2271.5,
+        "32": 2447.875
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "max_batch_size": {
+          "from": 128,
+          "to": 64
+        },
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64
+          ]
+        },
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              4,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-23_2448rps"
+    },
+    {
+      "number": 24,
+      "variant": "qd0us_ic4",
+      "fingerprint": "480865faf84f",
+      "peak_rps": 2029.12,
+      "peak_workers": 16,
+      "avg_batch_size": 1.99813166282009,
+      "rps_at_reference_concurrency": {
+        "8": 1869.0,
+        "16": 2029.125,
+        "32": null
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "dynamic_batching.max_queue_delay_microseconds": {
+          "from": 5000,
+          "to": 0
+        },
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              4,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-24_2029rps"
+    },
+    {
+      "number": 25,
+      "variant": "mbs32_ic4",
+      "fingerprint": "515e6964f042",
+      "peak_rps": 2411.38,
+      "peak_workers": 31,
+      "avg_batch_size": 6.808953341740227,
+      "rps_at_reference_concurrency": {
+        "8": 1876.75,
+        "16": 2249.125,
+        "32": 2405.75
+      },
+      "status": "ok",
+      "verdict": "no-gain",
+      "diff": {
+        "max_batch_size": {
+          "from": 128,
+          "to": 32
+        },
+        "dynamic_batching.preferred_batch_size": {
+          "from": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32,
+            48,
+            64,
+            96,
+            128
+          ],
+          "to": [
+            2,
+            4,
+            8,
+            16,
+            24,
+            32
+          ]
+        },
+        "instance_group": {
+          "from": [
+            [
+              1,
+              "KIND_GPU"
+            ]
+          ],
+          "to": [
+            [
+              4,
+              "KIND_GPU"
+            ]
+          ]
+        }
+      },
+      "folder": "exp-25_2411rps"
+    }
+  ]
+}

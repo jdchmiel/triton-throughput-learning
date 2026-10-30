@@ -1,0 +1,67 @@
+================ TRITON RAMP-UP LOAD TEST ================
+Target          : http://192.168.1.151:8000
+  endpoint      : miniLM-onnx (Priority 1) -> http://192.168.1.151:8000/v2/models/miniLM-onnx/infer
+Ramp            : 1 -> 60 connections/endpoint, +5 per stage
+Stages          : 15 x 8.0s (+1.0s warmup each)
+Early stop      : failure rate >= 10%, or aggregate gain < 2% for 2 stages
+Server stats    : on
+Single endpoint : onnx
+Label           : pbs:mid_qd500us_ic8 (63a7bf34fa62)
+==========================================================
+
+[stage   1]    1 conn/endpoint | aggregate   209.2 rps | failures   0.0% | avg batch 1.00
+[stage   2]    6 conn/endpoint | aggregate  1441.1 rps | failures   0.0% | avg batch 1.45
+[stage   3]    8 conn/endpoint | aggregate  1819.6 rps | failures   0.0% | avg batch 1.71
+[stage   4]   11 conn/endpoint | aggregate  2340.2 rps | failures   0.0% | avg batch 2.05
+[stage   5]   16 conn/endpoint | aggregate  3050.5 rps | failures   0.0% | avg batch 2.49
+[stage   6]   21 conn/endpoint | aggregate  3483.8 rps | failures   0.0% | avg batch 3.00
+[stage   7]   26 conn/endpoint | aggregate  3736.2 rps | failures   0.0% | avg batch 3.57
+[stage   8]   31 conn/endpoint | aggregate  3883.1 rps | failures   0.0% | avg batch 4.11
+[stage   9]   32 conn/endpoint | aggregate  3925.1 rps | failures   0.0% | avg batch 4.26
+[stage  10]   36 conn/endpoint | aggregate  3995.5 rps | failures   0.0% | avg batch 4.66
+
+Workers | Endpoint                   |     OK |  Fail |  Fail% |      RPS |  Mean ms |   p50 ms |   p95 ms |   p99 ms |  AvgBS
+------------------------------------------------------------------------------------------------------------------------------
+      1 | miniLM-onnx (Priority 1)   |   1674 |     0 |   0.0% |    209.2 |      4.7 |      4.9 |      5.2 |      5.5 |   1.00
+      1 | AGGREGATE                  |        |       |        |    209.2
+------------------------------------------------------------------------------------------------------------------------------
+      6 | miniLM-onnx (Priority 1)   |  11529 |     0 |   0.0% |   1441.1 |      4.1 |      3.8 |      5.3 |      6.1 |   1.45
+      6 | AGGREGATE                  |        |       |        |   1441.1
+------------------------------------------------------------------------------------------------------------------------------
+      8 | miniLM-onnx (Priority 1)   |  14557 |     0 |   0.0% |   1819.6 |      4.4 |      4.0 |      6.1 |      6.8 |   1.71
+      8 | AGGREGATE                  |        |       |        |   1819.6
+------------------------------------------------------------------------------------------------------------------------------
+     11 | miniLM-onnx (Priority 1)   |  18722 |     0 |   0.0% |   2340.2 |      4.7 |      4.7 |      6.6 |      7.3 |   2.05
+     11 | AGGREGATE                  |        |       |        |   2340.2
+------------------------------------------------------------------------------------------------------------------------------
+     16 | miniLM-onnx (Priority 1)   |  24404 |     0 |   0.0% |   3050.5 |      5.2 |      5.1 |      7.8 |      8.9 |   2.49
+     16 | AGGREGATE                  |        |       |        |   3050.5
+------------------------------------------------------------------------------------------------------------------------------
+     21 | miniLM-onnx (Priority 1)   |  27870 |     0 |   0.0% |   3483.8 |      6.0 |      5.6 |      9.7 |     12.2 |   3.00
+     21 | AGGREGATE                  |        |       |        |   3483.8
+------------------------------------------------------------------------------------------------------------------------------
+     26 | miniLM-onnx (Priority 1)   |  29890 |     0 |   0.0% |   3736.2 |      7.0 |      6.5 |     12.4 |     15.4 |   3.57
+     26 | AGGREGATE                  |        |       |        |   3736.2
+------------------------------------------------------------------------------------------------------------------------------
+     31 | miniLM-onnx (Priority 1)   |  31065 |     0 |   0.0% |   3883.1 |      8.0 |      7.1 |     15.1 |     21.2 |   4.11
+     31 | AGGREGATE                  |        |       |        |   3883.1
+------------------------------------------------------------------------------------------------------------------------------
+     32 | miniLM-onnx (Priority 1)   |  31401 |     0 |   0.0% |   3925.1 |      8.1 |      7.2 |     15.4 |     21.2 |   4.26
+     32 | AGGREGATE                  |        |       |        |   3925.1
+------------------------------------------------------------------------------------------------------------------------------
+     36 | miniLM-onnx (Priority 1)   |  31964 |     0 |   0.0% |   3995.5 |      9.0 |      7.7 |     18.2 |     25.1 |   4.66
+     36 | AGGREGATE                  |        |       |        |   3995.5
+------------------------------------------------------------------------------------------------------------------------------
+
+Ramp finished in 115.4s after 10 stage(s).
+Stop reason: aggregate throughput stopped improving (<2% for 2 consecutive stages) at 36 connections/endpoint
+Peak aggregate throughput: 3995.5 rps at 36 connections/endpoint
+
+CSV  : experiments/20261030-003519/exp-27_pending/ramp-results.csv
+PNG  : experiments/20261030-003519/exp-27_pending/ramp-throughput.png
+PNG  : experiments/20261030-003519/exp-27_pending/ramp-latency.png
+PNG  : experiments/20261030-003519/exp-27_pending/ramp-errors.png
+PNG  : experiments/20261030-003519/exp-27_pending/ramp-batch-size.png
+PNG  : experiments/20261030-003519/exp-27_pending/ramp-summary.png
+JSON : experiments/20261030-003519/exp-27_pending/run.json
+STATS: experiments/20261030-003519/exp-27_pending/stats.deltas.json

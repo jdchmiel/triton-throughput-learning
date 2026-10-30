@@ -1,0 +1,372 @@
+[
+  {
+    "workers": 1,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 2195,
+          "ns": 5157762898
+        },
+        "queue": {
+          "count": 2195,
+          "ns": 89126899
+        },
+        "compute_infer": {
+          "count": 2195,
+          "ns": 1691490526
+        },
+        "compute_input": {
+          "count": 2195,
+          "ns": 44325575
+        },
+        "compute_output": {
+          "count": 2195,
+          "ns": 44980482
+        },
+        "inference_count": 2195,
+        "execution_count": 2195,
+        "avg_batch_size": 1.0,
+        "batch_distribution": {
+          "1": 2195
+        }
+      }
+    }
+  },
+  {
+    "workers": 6,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 15908,
+          "ns": 39036744736
+        },
+        "queue": {
+          "count": 15908,
+          "ns": 600145956
+        },
+        "compute_infer": {
+          "count": 15908,
+          "ns": 12362581405
+        },
+        "compute_input": {
+          "count": 15908,
+          "ns": 285469485
+        },
+        "compute_output": {
+          "count": 15908,
+          "ns": 331918021
+        },
+        "inference_count": 15908,
+        "execution_count": 15884,
+        "avg_batch_size": 1.0015109544195417,
+        "batch_distribution": {
+          "1": 15862,
+          "2": 21,
+          "4": 1
+        }
+      }
+    }
+  },
+  {
+    "workers": 8,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 20749,
+          "ns": 54054233873
+        },
+        "queue": {
+          "count": 20749,
+          "ns": 860583809
+        },
+        "compute_infer": {
+          "count": 20749,
+          "ns": 17548040142
+        },
+        "compute_input": {
+          "count": 20749,
+          "ns": 393484755
+        },
+        "compute_output": {
+          "count": 20749,
+          "ns": 468718373
+        },
+        "inference_count": 20749,
+        "execution_count": 20674,
+        "avg_batch_size": 1.0036277449937119,
+        "batch_distribution": {
+          "1": 20617,
+          "2": 48,
+          "4": 9
+        }
+      }
+    }
+  },
+  {
+    "workers": 11,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 25245,
+          "ns": 81725748314
+        },
+        "queue": {
+          "count": 25245,
+          "ns": 4573350713
+        },
+        "compute_infer": {
+          "count": 25245,
+          "ns": 21842600040
+        },
+        "compute_input": {
+          "count": 25245,
+          "ns": 637224330
+        },
+        "compute_output": {
+          "count": 25245,
+          "ns": 721051451
+        },
+        "inference_count": 25245,
+        "execution_count": 22039,
+        "avg_batch_size": 1.1454693951631199,
+        "batch_distribution": {
+          "1": 18883,
+          "2": 3133,
+          "4": 22,
+          "8": 1
+        }
+      }
+    }
+  },
+  {
+    "workers": 16,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 28806,
+          "ns": 140049482008
+        },
+        "queue": {
+          "count": 28806,
+          "ns": 10635593755
+        },
+        "compute_infer": {
+          "count": 28806,
+          "ns": 24977782354
+        },
+        "compute_input": {
+          "count": 28806,
+          "ns": 978233100
+        },
+        "compute_output": {
+          "count": 28806,
+          "ns": 1245954660
+        },
+        "inference_count": 28806,
+        "execution_count": 18997,
+        "avg_batch_size": 1.5163446860030532,
+        "batch_distribution": {
+          "1": 13108,
+          "2": 3949,
+          "4": 1930,
+          "8": 10
+        }
+      }
+    }
+  },
+  {
+    "workers": 21,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 31891,
+          "ns": 207517034248
+        },
+        "queue": {
+          "count": 31891,
+          "ns": 17305776431
+        },
+        "compute_infer": {
+          "count": 31891,
+          "ns": 27690723609
+        },
+        "compute_input": {
+          "count": 31891,
+          "ns": 1323559987
+        },
+        "compute_output": {
+          "count": 31891,
+          "ns": 1896694844
+        },
+        "inference_count": 31891,
+        "execution_count": 15508,
+        "avg_batch_size": 2.05642249161723,
+        "batch_distribution": {
+          "1": 7251,
+          "2": 4551,
+          "4": 3540,
+          "8": 116,
+          "9": 50
+        }
+      }
+    }
+  },
+  {
+    "workers": 26,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 33660,
+          "ns": 279329811109
+        },
+        "queue": {
+          "count": 33660,
+          "ns": 23177645265
+        },
+        "compute_infer": {
+          "count": 33660,
+          "ns": 29112851835
+        },
+        "compute_input": {
+          "count": 33660,
+          "ns": 1511091012
+        },
+        "compute_output": {
+          "count": 33660,
+          "ns": 2535695397
+        },
+        "inference_count": 33660,
+        "execution_count": 12980,
+        "avg_batch_size": 2.593220338983051,
+        "batch_distribution": {
+          "1": 4574,
+          "2": 3716,
+          "4": 4044,
+          "8": 336,
+          "9": 310
+        }
+      }
+    }
+  },
+  {
+    "workers": 31,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 34971,
+          "ns": 351044325655
+        },
+        "queue": {
+          "count": 34971,
+          "ns": 29135540485
+        },
+        "compute_infer": {
+          "count": 34971,
+          "ns": 30159867711
+        },
+        "compute_input": {
+          "count": 34971,
+          "ns": 1670599822
+        },
+        "compute_output": {
+          "count": 34971,
+          "ns": 3209718736
+        },
+        "inference_count": 34971,
+        "execution_count": 10977,
+        "avg_batch_size": 3.1858431265373053,
+        "batch_distribution": {
+          "1": 2933,
+          "2": 2885,
+          "4": 3931,
+          "8": 508,
+          "9": 720
+        }
+      }
+    }
+  },
+  {
+    "workers": 32,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 35276,
+          "ns": 365028362162
+        },
+        "queue": {
+          "count": 35276,
+          "ns": 30381144635
+        },
+        "compute_infer": {
+          "count": 35276,
+          "ns": 30284900348
+        },
+        "compute_input": {
+          "count": 35276,
+          "ns": 1685995543
+        },
+        "compute_output": {
+          "count": 35276,
+          "ns": 3473550636
+        },
+        "inference_count": 35276,
+        "execution_count": 10641,
+        "avg_batch_size": 3.3151019641011183,
+        "batch_distribution": {
+          "1": 2689,
+          "2": 2719,
+          "4": 3887,
+          "8": 513,
+          "9": 833
+        }
+      }
+    }
+  },
+  {
+    "workers": 36,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 35986,
+          "ns": 423113296436
+        },
+        "queue": {
+          "count": 35986,
+          "ns": 35886640668
+        },
+        "compute_infer": {
+          "count": 35986,
+          "ns": 30927531797
+        },
+        "compute_input": {
+          "count": 35986,
+          "ns": 1759460667
+        },
+        "compute_output": {
+          "count": 35986,
+          "ns": 3841405593
+        },
+        "inference_count": 35986,
+        "execution_count": 9357,
+        "avg_batch_size": 3.8458907769584267,
+        "batch_distribution": {
+          "1": 2026,
+          "2": 2037,
+          "4": 3440,
+          "8": 560,
+          "9": 1294
+        }
+      }
+    }
+  }
+]

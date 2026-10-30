@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "label": "pbs:mid_ic8 (0a04e311ce47)",
+  "started_at": "2026-10-30T01:05:29.857425+00:00",
+  "finished_at": "2026-10-30T01:08:22.936598+00:00",
+  "elapsed_seconds": 173.079,
+  "git_sha": "a524bd7",
+  "run": {
+    "base_url": "http://192.168.1.151:8000",
+    "schedule": [
+      1,
+      6,
+      8,
+      11,
+      16,
+      21,
+      26,
+      31,
+      32,
+      36,
+      41,
+      46,
+      51,
+      56,
+      60
+    ],
+    "stage_duration_seconds": 8.0,
+    "warmup_seconds": 1.0,
+    "start_workers": 1,
+    "worker_increment": 5,
+    "max_workers": 60,
+    "thresholds": {
+      "plateau_threshold": 0.02,
+      "plateau_stages_required": 2,
+      "failure_stop_rate": 0.1,
+      "min_requests_per_stage": 20
+    }
+  },
+  "endpoints": [
+    {
+      "key": "onnx",
+      "model": "miniLM-onnx",
+      "url": "http://192.168.1.151:8000/v2/models/miniLM-onnx/infer",
+      "headers": {
+        "X-Amzn-SageMaker-Target-Model": "miniLM-onnx"
+      }
+    }
+  ],
+  "result": {
+    "stages_measured": 15,
+    "stop_reason": "reached MAX_WORKERS without hitting a stop rule",
+    "peak_aggregate_rps": 4289.25,
+    "peak_workers": 56,
+    "rps_at_reference_concurrency": {
+      "8": 868.0,
+      "16": 1505.125,
+      "32": 3171.25
+    },
+    "per_endpoint_peak": {
+      "onnx": {
+        "model": "miniLM-onnx",
+        "peak_rps": 4289.25,
+        "workers": 56,
+        "p50_ms": 12.199,
+        "p99_ms": 29.818,
+        "avg_batch_size": 9.097960151802656
+      }
+    }
+  }
+}

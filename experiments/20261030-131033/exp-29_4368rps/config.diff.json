@@ -1,0 +1,20 @@
+{
+  "dynamic_batching.max_queue_delay_microseconds": {
+    "from": 5000,
+    "to": 500
+  },
+  "instance_group": {
+    "from": [
+      [
+        1,
+        "KIND_GPU"
+      ]
+    ],
+    "to": [
+      [
+        10,
+        "KIND_GPU"
+      ]
+    ]
+  }
+}

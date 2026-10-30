@@ -1,0 +1,6 @@
+{
+  "dynamic_batching.max_queue_delay_microseconds": {
+    "from": 5000,
+    "to": 500
+  }
+}

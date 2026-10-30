@@ -1,0 +1,68 @@
+================ TRITON RAMP-UP LOAD TEST ================
+Target          : http://192.168.1.151:8000
+  endpoint      : miniLM-onnx (Priority 1) -> http://192.168.1.151:8000/v2/models/miniLM-onnx/infer
+Ramp            : 1 -> 60 connections/endpoint, +5 per stage
+Stages          : 15 x 8.0s (+1.0s warmup each)
+Early stop      : failure rate >= 10%, or aggregate gain < 2% for 2 stages
+Server stats    : on
+System metrics  : local + 7700x (cpu/core, vram, net vs link speed) every 1.0s
+Single endpoint : onnx
+Label           : mbs64 (67de470585c7)
+==========================================================
+
+System sampling : local + 7700x every 1.0s (route iface: enx00e04c6803f3)
+[stage   1]    1 conn/endpoint | aggregate   102.2 rps | failures   0.0% | avg batch 1.00
+           client cpu 3% | net 2.1 MB/s (2% of 1000M) ; server cpu 2% | net 2.0 MB/s (2% of 1000M) | vram 780 MiB
+[stage   2]    6 conn/endpoint | aggregate   624.5 rps | failures   0.0% | avg batch 4.00
+           client cpu 5% | net 12.8 MB/s (10% of 1000M) ; server cpu 8% [1 pegged] | net 12.3 MB/s (10% of 1000M) | vram 780 MiB
+[stage   3]    8 conn/endpoint | aggregate   625.0 rps | failures   0.0% | avg batch 4.00
+           client cpu 5% | net 12.8 MB/s (10% of 1000M) ; server cpu 8% [1 pegged] | net 12.3 MB/s (10% of 1000M) | vram 780 MiB
+[stage   4]   11 conn/endpoint | aggregate   667.0 rps | failures   0.0% | avg batch 7.98
+           client cpu 6% | net 13.6 MB/s (10% of 1000M) ; server cpu 8% [1 pegged] | net 13.1 MB/s (10% of 1000M) | vram 780 MiB  <-- server: 1/16 cores pinned >=95% for the whole stage
+[stage   5]   16 conn/endpoint | aggregate   685.8 rps | failures   0.0% | avg batch 14.82
+           client cpu 6% | net 14.0 MB/s (11% of 1000M) ; server cpu 8% [1 pegged] | net 13.4 MB/s (10% of 1000M) | vram 780 MiB
+[stage   6]   21 conn/endpoint | aggregate   686.8 rps | failures   0.0% | avg batch 16.15
+           client cpu 5% | net 14.0 MB/s (11% of 1000M) ; server cpu 8% [1 pegged] | net 13.5 MB/s (10% of 1000M) | vram 780 MiB
+[stage   7]   26 conn/endpoint | aggregate   682.5 rps | failures   0.0% | avg batch 23.67
+           client cpu 6% | net 13.9 MB/s (11% of 1000M) ; server cpu 8% [2 pegged] | net 13.4 MB/s (10% of 1000M) | vram 780 MiB
+
+Workers | Endpoint                   |     OK |  Fail |  Fail% |      RPS |  Mean ms |   p50 ms |   p95 ms |   p99 ms |  AvgBS
+------------------------------------------------------------------------------------------------------------------------------
+      1 | miniLM-onnx (Priority 1)   |    818 |     0 |   0.0% |    102.2 |      9.7 |      9.9 |     10.3 |     10.7 |   1.00
+      1 | AGGREGATE                  |        |       |        |    102.2
+------------------------------------------------------------------------------------------------------------------------------
+      6 | miniLM-onnx (Priority 1)   |   4996 |     0 |   0.0% |    624.5 |      9.6 |      9.6 |     10.2 |     10.6 |   4.00
+      6 | AGGREGATE                  |        |       |        |    624.5
+------------------------------------------------------------------------------------------------------------------------------
+      8 | miniLM-onnx (Priority 1)   |   5000 |     0 |   0.0% |    625.0 |     12.8 |     12.7 |     13.1 |     13.3 |   4.00
+      8 | AGGREGATE                  |        |       |        |    625.0
+------------------------------------------------------------------------------------------------------------------------------
+     11 | miniLM-onnx (Priority 1)   |   5336 |     0 |   0.0% |    667.0 |     16.4 |     16.2 |     17.2 |     17.4 |   7.98
+     11 | AGGREGATE                  |        |       |        |    667.0
+------------------------------------------------------------------------------------------------------------------------------
+     16 | miniLM-onnx (Priority 1)   |   5486 |     0 |   0.0% |    685.8 |     23.3 |     23.2 |     24.2 |     24.6 |  14.82
+     16 | AGGREGATE                  |        |       |        |    685.8
+------------------------------------------------------------------------------------------------------------------------------
+     21 | miniLM-onnx (Priority 1)   |   5494 |     0 |   0.0% |    686.8 |     30.5 |     30.2 |     31.7 |     32.5 |  16.15
+     21 | AGGREGATE                  |        |       |        |    686.8
+------------------------------------------------------------------------------------------------------------------------------
+     26 | miniLM-onnx (Priority 1)   |   5460 |     0 |   0.0% |    682.5 |     38.0 |     38.1 |     39.3 |     39.9 |  23.67
+     26 | AGGREGATE                  |        |       |        |    682.5
+------------------------------------------------------------------------------------------------------------------------------
+
+Ramp finished in 82.1s after 7 stage(s).
+Stop reason: aggregate throughput stopped improving (<2% for 2 consecutive stages) at 26 connections/endpoint
+Peak aggregate throughput: 686.8 rps at 21 connections/endpoint
+Peak stage resources     : client cpu 5% | net 14.0 MB/s (11% of 1000M) ; server cpu 8% [1 pegged] | net 13.5 MB/s (10% of 1000M) | vram 780 MiB
+
+Note: 1/7 stages reported a saturated resource.
+
+CSV  : experiments/20261030-131033/exp-06_pending/ramp-results.csv
+PNG  : experiments/20261030-131033/exp-06_pending/ramp-throughput.png
+PNG  : experiments/20261030-131033/exp-06_pending/ramp-latency.png
+PNG  : experiments/20261030-131033/exp-06_pending/ramp-errors.png
+PNG  : experiments/20261030-131033/exp-06_pending/ramp-batch-size.png
+PNG  : experiments/20261030-131033/exp-06_pending/ramp-summary.png
+JSON : experiments/20261030-131033/exp-06_pending/run.json
+STATS: experiments/20261030-131033/exp-06_pending/stats.deltas.json
+SYSTM: experiments/20261030-131033/exp-06_pending/system.json

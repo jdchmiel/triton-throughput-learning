@@ -1,0 +1,9 @@
+workers,endpoint,duration_s,successes,failures,failure_rate,requests_per_second,mean_ms,p50_ms,p95_ms,p99_ms,max_ms,top_errors,triton_inference_count,triton_execution_count,avg_batch_size,queue_ns,compute_infer_ns,batch_distribution
+1,onnx,8.000,445,0,0.0000,55.625,17.892,14.678,34.909,51.446,114.474,,508,508,1.000,2617004647,451037480,bs1=v508
+1,aggregate,,,,,55.625,,,,,,,,,,,,
+6,onnx,8.000,1272,0,0.0000,159.000,37.553,33.012,74.781,105.207,135.827,,1446,730,1.981,3595334098,1153844074,bs1=v206; bs2=v428; bs4=v96
+6,aggregate,,,,,159.000,,,,,,,,,,,,
+8,onnx,8.000,932,0,0.0000,116.500,70.141,48.430,199.599,510.069,1833.912,,986,465,2.120,3505655139,786637984,bs1=v118; bs2=v261; bs4=v85; bs6=v1
+8,aggregate,,,,,116.500,,,,,,,,,,,,
+11,onnx,8.000,795,0,0.0000,99.375,110.899,61.747,278.155,702.167,1778.614,,935,400,2.337,3079365384,746140225,bs1=v102; bs2=v217; bs3=v6; bs4=v54; bs5=v1; bs8=v20
+11,aggregate,,,,,99.375,,,,,,,,,,,,

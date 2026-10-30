@@ -1,0 +1,39 @@
+{
+  "dynamic_batching.preferred_batch_size": {
+    "from": [
+      2,
+      4,
+      8,
+      16,
+      24,
+      32,
+      48,
+      64,
+      96,
+      128
+    ],
+    "to": [
+      8,
+      16,
+      32
+    ]
+  },
+  "dynamic_batching.max_queue_delay_microseconds": {
+    "from": 5000,
+    "to": 25000
+  },
+  "instance_group": {
+    "from": [
+      [
+        1,
+        "KIND_GPU"
+      ]
+    ],
+    "to": [
+      [
+        8,
+        "KIND_GPU"
+      ]
+    ]
+  }
+}

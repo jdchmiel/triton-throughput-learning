@@ -1,0 +1,55 @@
+================ TRITON RAMP-UP LOAD TEST ================
+Target          : http://192.168.1.151:8000
+  endpoint      : miniLM-onnx (Priority 1) -> http://192.168.1.151:8000/v2/models/miniLM-onnx/infer
+Ramp            : 1 -> 60 connections/endpoint, +5 per stage
+Stages          : 15 x 8.0s (+1.0s warmup each)
+Early stop      : failure rate >= 10%, or aggregate gain < 2% for 2 stages
+Server stats    : on
+Single endpoint : onnx
+Label           : mbs1_ic8 (00a168b77c21)
+==========================================================
+
+[stage   1]    1 conn/endpoint | aggregate   263.8 rps | failures   0.0% | avg batch 1.00
+[stage   2]    6 conn/endpoint | aggregate  1761.5 rps | failures   0.0% | avg batch 1.00
+[stage   3]    8 conn/endpoint | aggregate  2285.2 rps | failures   0.0% | avg batch 1.00
+[stage   4]   11 conn/endpoint | aggregate  2853.6 rps | failures   0.0% | avg batch 1.00
+[stage   5]   16 conn/endpoint | aggregate  2918.5 rps | failures   0.0% | avg batch 1.00
+[stage   6]   21 conn/endpoint | aggregate  2932.5 rps | failures   0.0% | avg batch 1.00
+[stage   7]   26 conn/endpoint | aggregate  2951.2 rps | failures   0.0% | avg batch 1.00
+
+Workers | Endpoint                   |     OK |  Fail |  Fail% |      RPS |  Mean ms |   p50 ms |   p95 ms |   p99 ms |  AvgBS
+------------------------------------------------------------------------------------------------------------------------------
+      1 | miniLM-onnx (Priority 1)   |   2110 |     0 |   0.0% |    263.8 |      3.8 |      3.6 |      4.6 |      4.9 |   1.00
+      1 | AGGREGATE                  |        |       |        |    263.8
+------------------------------------------------------------------------------------------------------------------------------
+      6 | miniLM-onnx (Priority 1)   |  14092 |     0 |   0.0% |   1761.5 |      3.4 |      3.3 |      4.1 |      4.8 |   1.00
+      6 | AGGREGATE                  |        |       |        |   1761.5
+------------------------------------------------------------------------------------------------------------------------------
+      8 | miniLM-onnx (Priority 1)   |  18282 |     0 |   0.0% |   2285.2 |      3.5 |      3.4 |      4.2 |      5.0 |   1.00
+      8 | AGGREGATE                  |        |       |        |   2285.2
+------------------------------------------------------------------------------------------------------------------------------
+     11 | miniLM-onnx (Priority 1)   |  22829 |     0 |   0.0% |   2853.6 |      3.8 |      3.8 |      4.8 |      5.6 |   1.00
+     11 | AGGREGATE                  |        |       |        |   2853.6
+------------------------------------------------------------------------------------------------------------------------------
+     16 | miniLM-onnx (Priority 1)   |  23348 |     0 |   0.0% |   2918.5 |      5.5 |      5.4 |      6.6 |      7.7 |   1.00
+     16 | AGGREGATE                  |        |       |        |   2918.5
+------------------------------------------------------------------------------------------------------------------------------
+     21 | miniLM-onnx (Priority 1)   |  23460 |     0 |   0.0% |   2932.5 |      7.2 |      7.1 |      8.3 |      9.3 |   1.00
+     21 | AGGREGATE                  |        |       |        |   2932.5
+------------------------------------------------------------------------------------------------------------------------------
+     26 | miniLM-onnx (Priority 1)   |  23610 |     0 |   0.0% |   2951.2 |      8.8 |      8.7 |      9.9 |     10.8 |   1.00
+     26 | AGGREGATE                  |        |       |        |   2951.2
+------------------------------------------------------------------------------------------------------------------------------
+
+Ramp finished in 80.8s after 7 stage(s).
+Stop reason: aggregate throughput stopped improving (<2% for 2 consecutive stages) at 26 connections/endpoint
+Peak aggregate throughput: 2951.2 rps at 26 connections/endpoint
+
+CSV  : experiments/20261030-003519/exp-22_pending/ramp-results.csv
+PNG  : experiments/20261030-003519/exp-22_pending/ramp-throughput.png
+PNG  : experiments/20261030-003519/exp-22_pending/ramp-latency.png
+PNG  : experiments/20261030-003519/exp-22_pending/ramp-errors.png
+PNG  : experiments/20261030-003519/exp-22_pending/ramp-batch-size.png
+PNG  : experiments/20261030-003519/exp-22_pending/ramp-summary.png
+JSON : experiments/20261030-003519/exp-22_pending/run.json
+STATS: experiments/20261030-003519/exp-22_pending/stats.deltas.json

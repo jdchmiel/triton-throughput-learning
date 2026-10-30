@@ -1,0 +1,192 @@
+[
+  {
+    "workers": 1,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 426,
+          "ns": 3259171708
+        },
+        "queue": {
+          "count": 426,
+          "ns": 2184034571
+        },
+        "compute_infer": {
+          "count": 426,
+          "ns": 366790238
+        },
+        "compute_input": {
+          "count": 426,
+          "ns": 10442702
+        },
+        "compute_output": {
+          "count": 426,
+          "ns": 9379768
+        },
+        "inference_count": 426,
+        "execution_count": 426,
+        "avg_batch_size": 1.0,
+        "batch_distribution": {
+          "1": 426
+        }
+      }
+    }
+  },
+  {
+    "workers": 6,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 2827,
+          "ns": 21845129806
+        },
+        "queue": {
+          "count": 2827,
+          "ns": 7375058816
+        },
+        "compute_infer": {
+          "count": 2827,
+          "ns": 2050405752
+        },
+        "compute_input": {
+          "count": 2827,
+          "ns": 105957706
+        },
+        "compute_output": {
+          "count": 2827,
+          "ns": 99254340
+        },
+        "inference_count": 2827,
+        "execution_count": 1134,
+        "avg_batch_size": 2.4929453262786594,
+        "batch_distribution": {
+          "1": 125,
+          "2": 667,
+          "4": 342
+        }
+      }
+    }
+  },
+  {
+    "workers": 8,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 4325,
+          "ns": 41787394405
+        },
+        "queue": {
+          "count": 4325,
+          "ns": 16988374195
+        },
+        "compute_infer": {
+          "count": 4325,
+          "ns": 3052559471
+        },
+        "compute_input": {
+          "count": 4325,
+          "ns": 150890901
+        },
+        "compute_output": {
+          "count": 4325,
+          "ns": 167195043
+        },
+        "inference_count": 4325,
+        "execution_count": 1422,
+        "avg_batch_size": 3.0414908579465543,
+        "batch_distribution": {
+          "1": 136,
+          "2": 472,
+          "3": 15,
+          "4": 798,
+          "8": 1
+        }
+      }
+    }
+  },
+  {
+    "workers": 11,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 3566,
+          "ns": 44028767982
+        },
+        "queue": {
+          "count": 3566,
+          "ns": 16690068784
+        },
+        "compute_infer": {
+          "count": 3566,
+          "ns": 2545214597
+        },
+        "compute_input": {
+          "count": 3566,
+          "ns": 127926575
+        },
+        "compute_output": {
+          "count": 3566,
+          "ns": 181517914
+        },
+        "inference_count": 3566,
+        "execution_count": 988,
+        "avg_batch_size": 3.6093117408906883,
+        "batch_distribution": {
+          "1": 86,
+          "2": 341,
+          "3": 21,
+          "4": 383,
+          "5": 7,
+          "6": 6,
+          "7": 20,
+          "8": 124
+        }
+      }
+    }
+  },
+  {
+    "workers": 16,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 2667,
+          "ns": 42283547568
+        },
+        "queue": {
+          "count": 2667,
+          "ns": 18045442694
+        },
+        "compute_infer": {
+          "count": 2667,
+          "ns": 1948415944
+        },
+        "compute_input": {
+          "count": 2667,
+          "ns": 100278203
+        },
+        "compute_output": {
+          "count": 2667,
+          "ns": 159179301
+        },
+        "inference_count": 2667,
+        "execution_count": 679,
+        "avg_batch_size": 3.9278350515463916,
+        "batch_distribution": {
+          "1": 83,
+          "2": 240,
+          "3": 13,
+          "4": 151,
+          "5": 12,
+          "6": 15,
+          "7": 9,
+          "8": 156
+        }
+      }
+    }
+  }
+]

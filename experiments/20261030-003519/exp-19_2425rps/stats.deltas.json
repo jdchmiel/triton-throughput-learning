@@ -1,0 +1,329 @@
+[
+  {
+    "workers": 1,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 934,
+          "ns": 7103620920
+        },
+        "queue": {
+          "count": 934,
+          "ns": 4762148120
+        },
+        "compute_infer": {
+          "count": 934,
+          "ns": 783070058
+        },
+        "compute_input": {
+          "count": 934,
+          "ns": 21614120
+        },
+        "compute_output": {
+          "count": 934,
+          "ns": 20814187
+        },
+        "inference_count": 934,
+        "execution_count": 934,
+        "avg_batch_size": 1.0,
+        "batch_distribution": {
+          "1": 934
+        }
+      }
+    }
+  },
+  {
+    "workers": 6,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 11466,
+          "ns": 50460449678
+        },
+        "queue": {
+          "count": 11466,
+          "ns": 6653998211
+        },
+        "compute_infer": {
+          "count": 11466,
+          "ns": 8074568402
+        },
+        "compute_input": {
+          "count": 11466,
+          "ns": 411406737
+        },
+        "compute_output": {
+          "count": 11466,
+          "ns": 334653454
+        },
+        "inference_count": 11466,
+        "execution_count": 5734,
+        "avg_batch_size": 1.999651203348448,
+        "batch_distribution": {
+          "1": 2,
+          "2": 5732
+        }
+      }
+    }
+  },
+  {
+    "workers": 8,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 16934,
+          "ns": 71545675447
+        },
+        "queue": {
+          "count": 16934,
+          "ns": 5826795825
+        },
+        "compute_infer": {
+          "count": 16934,
+          "ns": 11761747356
+        },
+        "compute_input": {
+          "count": 16934,
+          "ns": 603599184
+        },
+        "compute_output": {
+          "count": 16934,
+          "ns": 532996686
+        },
+        "inference_count": 16934,
+        "execution_count": 8467,
+        "avg_batch_size": 2.0,
+        "batch_distribution": {
+          "2": 8467
+        }
+      }
+    }
+  },
+  {
+    "workers": 11,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 18787,
+          "ns": 108287549215
+        },
+        "queue": {
+          "count": 18787,
+          "ns": 14407961171
+        },
+        "compute_infer": {
+          "count": 18787,
+          "ns": 13084493833
+        },
+        "compute_input": {
+          "count": 18787,
+          "ns": 693552576
+        },
+        "compute_output": {
+          "count": 18787,
+          "ns": 743788237
+        },
+        "inference_count": 18787,
+        "execution_count": 7613,
+        "avg_batch_size": 2.467752528569552,
+        "batch_distribution": {
+          "1": 1,
+          "2": 5831,
+          "4": 1781
+        }
+      }
+    }
+  },
+  {
+    "workers": 16,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 20309,
+          "ns": 176632573419
+        },
+        "queue": {
+          "count": 20309,
+          "ns": 28798703314
+        },
+        "compute_infer": {
+          "count": 20309,
+          "ns": 14922021705
+        },
+        "compute_input": {
+          "count": 20309,
+          "ns": 773060983
+        },
+        "compute_output": {
+          "count": 20309,
+          "ns": 1174545457
+        },
+        "inference_count": 20309,
+        "execution_count": 5478,
+        "avg_batch_size": 3.707374954362906,
+        "batch_distribution": {
+          "1": 1,
+          "2": 1446,
+          "4": 3708,
+          "8": 323
+        }
+      }
+    }
+  },
+  {
+    "workers": 21,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 21096,
+          "ns": 253061180748
+        },
+        "queue": {
+          "count": 21096,
+          "ns": 40016108341
+        },
+        "compute_infer": {
+          "count": 21096,
+          "ns": 15663789742
+        },
+        "compute_input": {
+          "count": 21096,
+          "ns": 829824958
+        },
+        "compute_output": {
+          "count": 21096,
+          "ns": 1637423468
+        },
+        "inference_count": 21096,
+        "execution_count": 4247,
+        "avg_batch_size": 4.967271014834001,
+        "batch_distribution": {
+          "2": 876,
+          "4": 1928,
+          "8": 1432,
+          "16": 11
+        }
+      }
+    }
+  },
+  {
+    "workers": 26,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 21598,
+          "ns": 326113552065
+        },
+        "queue": {
+          "count": 21598,
+          "ns": 53988960893
+        },
+        "compute_infer": {
+          "count": 21598,
+          "ns": 16193511190
+        },
+        "compute_input": {
+          "count": 21598,
+          "ns": 865770886
+        },
+        "compute_output": {
+          "count": 21598,
+          "ns": 1965242672
+        },
+        "inference_count": 21598,
+        "execution_count": 3385,
+        "avg_batch_size": 6.3805022156573115,
+        "batch_distribution": {
+          "2": 339,
+          "4": 1104,
+          "8": 1821,
+          "16": 121
+        }
+      }
+    }
+  },
+  {
+    "workers": 31,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 21774,
+          "ns": 404213489470
+        },
+        "queue": {
+          "count": 21774,
+          "ns": 63729499184
+        },
+        "compute_infer": {
+          "count": 21774,
+          "ns": 16787836162
+        },
+        "compute_input": {
+          "count": 21774,
+          "ns": 922965010
+        },
+        "compute_output": {
+          "count": 21774,
+          "ns": 2423011408
+        },
+        "inference_count": 21774,
+        "execution_count": 2965,
+        "avg_batch_size": 7.343676222596964,
+        "batch_distribution": {
+          "2": 353,
+          "4": 785,
+          "8": 1415,
+          "16": 410,
+          "24": 2
+        }
+      }
+    }
+  },
+  {
+    "workers": 32,
+    "endpoints": {
+      "onnx": {
+        "available": true,
+        "success": {
+          "count": 21747,
+          "ns": 417200883625
+        },
+        "queue": {
+          "count": 21747,
+          "ns": 64153600993
+        },
+        "compute_infer": {
+          "count": 21747,
+          "ns": 16772174678
+        },
+        "compute_input": {
+          "count": 21747,
+          "ns": 917374218
+        },
+        "compute_output": {
+          "count": 21747,
+          "ns": 2488789973
+        },
+        "inference_count": 21747,
+        "execution_count": 2868,
+        "avg_batch_size": 7.582635983263598,
+        "batch_distribution": {
+          "1": 1,
+          "2": 335,
+          "4": 701,
+          "8": 1389,
+          "16": 431,
+          "24": 11
+        }
+      }
+    }
+  }
+]

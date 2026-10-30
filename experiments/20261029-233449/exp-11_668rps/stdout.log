@@ -1,0 +1,51 @@
+================ TRITON RAMP-UP LOAD TEST ================
+Target          : http://192.168.1.151:8000
+  endpoint      : miniLM-onnx (Priority 1) -> http://192.168.1.151:8000/v2/models/miniLM-onnx/infer
+Ramp            : 1 -> 60 connections/endpoint, +5 per stage
+Stages          : 15 x 8.0s (+1.0s warmup each)
+Early stop      : failure rate >= 10%, or aggregate gain < 2% for 2 stages
+Server stats    : on
+Single endpoint : onnx
+Label           : pbs:wide (4654323d7b3b)
+==========================================================
+
+[stage   1]    1 conn/endpoint | aggregate    26.5 rps | failures   0.0% | avg batch 1.00
+[stage   2]    6 conn/endpoint | aggregate   612.0 rps | failures   0.0% | avg batch 3.98
+[stage   3]    8 conn/endpoint | aggregate   614.2 rps | failures   0.0% | avg batch 4.00
+[stage   4]   11 conn/endpoint | aggregate   659.6 rps | failures   0.0% | avg batch 7.99
+[stage   5]   16 conn/endpoint | aggregate   666.1 rps | failures   0.0% | avg batch 14.88
+[stage   6]   21 conn/endpoint | aggregate   668.0 rps | failures   0.0% | avg batch 16.43
+
+Workers | Endpoint                   |     OK |  Fail |  Fail% |      RPS |  Mean ms |   p50 ms |   p95 ms |   p99 ms |  AvgBS
+------------------------------------------------------------------------------------------------------------------------------
+      1 | miniLM-onnx (Priority 1)   |    212 |     0 |   0.0% |     26.5 |      8.9 |      8.9 |      9.4 |      9.9 |   1.00
+      1 | AGGREGATE                  |        |       |        |     26.5
+------------------------------------------------------------------------------------------------------------------------------
+      6 | miniLM-onnx (Priority 1)   |   4896 |     0 |   0.0% |    612.0 |      8.9 |      8.9 |     10.2 |     10.4 |   3.98
+      6 | AGGREGATE                  |        |       |        |    612.0
+------------------------------------------------------------------------------------------------------------------------------
+      8 | miniLM-onnx (Priority 1)   |   4914 |     0 |   0.0% |    614.2 |     13.0 |     13.0 |     13.5 |     13.7 |   4.00
+      8 | AGGREGATE                  |        |       |        |    614.2
+------------------------------------------------------------------------------------------------------------------------------
+     11 | miniLM-onnx (Priority 1)   |   5277 |     0 |   0.0% |    659.6 |     16.6 |     16.5 |     17.6 |     18.1 |   7.99
+     11 | AGGREGATE                  |        |       |        |    659.6
+------------------------------------------------------------------------------------------------------------------------------
+     16 | miniLM-onnx (Priority 1)   |   5329 |     0 |   0.0% |    666.1 |     23.9 |     24.0 |     24.9 |     25.4 |  14.88
+     16 | AGGREGATE                  |        |       |        |    666.1
+------------------------------------------------------------------------------------------------------------------------------
+     21 | miniLM-onnx (Priority 1)   |   5344 |     0 |   0.0% |    668.0 |     31.4 |     31.3 |     32.6 |     32.9 |  16.43
+     21 | AGGREGATE                  |        |       |        |    668.0
+------------------------------------------------------------------------------------------------------------------------------
+
+Ramp finished in 72.8s after 6 stage(s).
+Stop reason: aggregate throughput stopped improving (<2% for 2 consecutive stages) at 21 connections/endpoint
+Peak aggregate throughput: 668.0 rps at 21 connections/endpoint
+
+CSV  : experiments/20261029-233449/exp-11_pending/ramp-results.csv
+PNG  : experiments/20261029-233449/exp-11_pending/ramp-throughput.png
+PNG  : experiments/20261029-233449/exp-11_pending/ramp-latency.png
+PNG  : experiments/20261029-233449/exp-11_pending/ramp-errors.png
+PNG  : experiments/20261029-233449/exp-11_pending/ramp-batch-size.png
+PNG  : experiments/20261029-233449/exp-11_pending/ramp-summary.png
+JSON : experiments/20261029-233449/exp-11_pending/run.json
+STATS: experiments/20261029-233449/exp-11_pending/stats.deltas.json

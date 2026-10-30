@@ -1,0 +1,61 @@
+================ TRITON RAMP-UP LOAD TEST ================
+Target          : http://192.168.1.151:8000
+  endpoint      : miniLM-onnx (Priority 1) -> http://192.168.1.151:8000/v2/models/miniLM-onnx/infer
+Ramp            : 1 -> 60 connections/endpoint, +5 per stage
+Stages          : 15 x 8.0s (+1.0s warmup each)
+Early stop      : failure rate >= 10%, or aggregate gain < 2% for 2 stages
+Server stats    : on
+System metrics  : local + 7700x (cpu/core, vram, net vs link speed) every 1.0s
+Single endpoint : onnx
+Label           : mbs8 (2b8a3bf626bb)
+==========================================================
+
+System sampling : local + 7700x every 1.0s (route iface: enx00e04c6803f3)
+[stage   1]    1 conn/endpoint | aggregate   102.4 rps | failures   0.0% | avg batch 1.00
+           client cpu 2% | net 2.1 MB/s (2% of 1000M) ; server cpu 2% | net 2.0 MB/s (2% of 1000M) | vram 780 MiB
+[stage   2]    6 conn/endpoint | aggregate   623.0 rps | failures   0.0% | avg batch 4.00
+           client cpu 5% | net 12.7 MB/s (10% of 1000M) ; server cpu 8% [2 pegged] | net 12.2 MB/s (9% of 1000M) | vram 780 MiB
+[stage   3]    8 conn/endpoint | aggregate   626.0 rps | failures   0.0% | avg batch 4.00
+           client cpu 5% | net 12.8 MB/s (10% of 1000M) ; server cpu 8% [2 pegged] | net 12.3 MB/s (10% of 1000M) | vram 780 MiB
+[stage   4]   11 conn/endpoint | aggregate   665.8 rps | failures   0.0% | avg batch 7.96
+           client cpu 5% | net 13.6 MB/s (10% of 1000M) ; server cpu 8% [2 pegged] | net 13.1 MB/s (10% of 1000M) | vram 780 MiB
+[stage   5]   16 conn/endpoint | aggregate   662.5 rps | failures   0.0% | avg batch 7.99
+           client cpu 5% | net 13.6 MB/s (10% of 1000M) ; server cpu 8% [2 pegged] | net 13.0 MB/s (10% of 1000M) | vram 780 MiB
+[stage   6]   21 conn/endpoint | aggregate   655.1 rps | failures   0.0% | avg batch 7.99
+           client cpu 5% | net 13.4 MB/s (10% of 1000M) ; server cpu 8% [2 pegged] | net 12.8 MB/s (10% of 1000M) | vram 780 MiB
+
+Workers | Endpoint                   |     OK |  Fail |  Fail% |      RPS |  Mean ms |   p50 ms |   p95 ms |   p99 ms |  AvgBS
+------------------------------------------------------------------------------------------------------------------------------
+      1 | miniLM-onnx (Priority 1)   |    819 |     0 |   0.0% |    102.4 |      9.7 |      9.8 |     10.4 |     10.6 |   1.00
+      1 | AGGREGATE                  |        |       |        |    102.4
+------------------------------------------------------------------------------------------------------------------------------
+      6 | miniLM-onnx (Priority 1)   |   4984 |     0 |   0.0% |    623.0 |      9.6 |      9.7 |     10.3 |     10.6 |   4.00
+      6 | AGGREGATE                  |        |       |        |    623.0
+------------------------------------------------------------------------------------------------------------------------------
+      8 | miniLM-onnx (Priority 1)   |   5008 |     0 |   0.0% |    626.0 |     12.7 |     12.7 |     13.1 |     13.4 |   4.00
+      8 | AGGREGATE                  |        |       |        |    626.0
+------------------------------------------------------------------------------------------------------------------------------
+     11 | miniLM-onnx (Priority 1)   |   5326 |     0 |   0.0% |    665.8 |     16.5 |     16.4 |     17.5 |     17.8 |   7.96
+     11 | AGGREGATE                  |        |       |        |    665.8
+------------------------------------------------------------------------------------------------------------------------------
+     16 | miniLM-onnx (Priority 1)   |   5300 |     0 |   0.0% |    662.5 |     24.1 |     24.0 |     24.8 |     25.2 |   7.99
+     16 | AGGREGATE                  |        |       |        |    662.5
+------------------------------------------------------------------------------------------------------------------------------
+     21 | miniLM-onnx (Priority 1)   |   5241 |     0 |   0.0% |    655.1 |     32.0 |     31.9 |     32.9 |     33.2 |   7.99
+     21 | AGGREGATE                  |        |       |        |    655.1
+------------------------------------------------------------------------------------------------------------------------------
+
+Ramp finished in 70.3s after 6 stage(s).
+Stop reason: aggregate throughput stopped improving (<2% for 2 consecutive stages) at 21 connections/endpoint
+Peak aggregate throughput: 665.8 rps at 11 connections/endpoint
+Peak stage resources     : client cpu 5% | net 13.6 MB/s (10% of 1000M) ; server cpu 8% [2 pegged] | net 13.1 MB/s (10% of 1000M) | vram 780 MiB
+
+CSV  : experiments/20261030-131033/exp-03_pending/ramp-results.csv
+PNG  : experiments/20261030-131033/exp-03_pending/ramp-throughput.png
+PNG  : experiments/20261030-131033/exp-03_pending/ramp-latency.png
+PNG  : experiments/20261030-131033/exp-03_pending/ramp-errors.png
+PNG  : experiments/20261030-131033/exp-03_pending/ramp-batch-size.png
+PNG  : experiments/20261030-131033/exp-03_pending/ramp-summary.png
+JSON : experiments/20261030-131033/exp-03_pending/run.json
+STATS: experiments/20261030-131033/exp-03_pending/stats.deltas.json
+SYSTM: experiments/20261030-131033/exp-03_pending/system.json

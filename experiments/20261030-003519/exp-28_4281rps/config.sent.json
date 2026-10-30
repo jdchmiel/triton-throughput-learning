@@ -1,0 +1,111 @@
+{
+  "name": "miniLM-onnx",
+  "platform": "onnxruntime_onnx",
+  "backend": "onnxruntime",
+  "runtime": "",
+  "version_policy": {
+    "latest": {
+      "num_versions": 1
+    }
+  },
+  "max_batch_size": 128,
+  "input": [
+    {
+      "name": "input_ids",
+      "data_type": "TYPE_INT64",
+      "format": "FORMAT_NONE",
+      "dims": [
+        -1
+      ],
+      "is_shape_tensor": false,
+      "allow_ragged_batch": false,
+      "optional": false,
+      "is_non_linear_format_io": false
+    },
+    {
+      "name": "attention_mask",
+      "data_type": "TYPE_INT64",
+      "format": "FORMAT_NONE",
+      "dims": [
+        -1
+      ],
+      "is_shape_tensor": false,
+      "allow_ragged_batch": false,
+      "optional": false,
+      "is_non_linear_format_io": false
+    },
+    {
+      "name": "token_type_ids",
+      "data_type": "TYPE_INT64",
+      "format": "FORMAT_NONE",
+      "dims": [
+        -1
+      ],
+      "is_shape_tensor": false,
+      "allow_ragged_batch": false,
+      "optional": false,
+      "is_non_linear_format_io": false
+    }
+  ],
+  "output": [
+    {
+      "name": "last_hidden_state",
+      "data_type": "TYPE_FP32",
+      "dims": [
+        -1,
+        384
+      ],
+      "label_filename": "",
+      "is_shape_tensor": false,
+      "is_non_linear_format_io": false
+    }
+  ],
+  "batch_input": [],
+  "batch_output": [],
+  "optimization": {
+    "priority": "PRIORITY_DEFAULT",
+    "input_pinned_memory": {
+      "enable": true
+    },
+    "output_pinned_memory": {
+      "enable": true
+    },
+    "gather_kernel_buffer_threshold": 0,
+    "eager_batching": false
+  },
+  "dynamic_batching": {
+    "preferred_batch_size": [
+      8,
+      16,
+      32
+    ],
+    "max_queue_delay_microseconds": 0,
+    "preserve_ordering": false,
+    "priority_levels": 0,
+    "default_priority_level": 0,
+    "priority_queue_policy": {}
+  },
+  "instance_group": [
+    {
+      "name": "miniLM-onnx_0",
+      "kind": "KIND_GPU",
+      "count": 8,
+      "rate_limiter": {
+        "resources": [],
+        "priority": 1
+      },
+      "gpus": [
+        0
+      ],
+      "secondary_devices": [],
+      "profile": [],
+      "passive": false,
+      "host_policy": ""
+    }
+  ],
+  "default_model_filename": "model.onnx",
+  "cc_model_filenames": {},
+  "metric_tags": {},
+  "parameters": {},
+  "model_warmup": []
+}

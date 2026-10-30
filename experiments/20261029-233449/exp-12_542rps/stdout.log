@@ -1,0 +1,43 @@
+================ TRITON RAMP-UP LOAD TEST ================
+Target          : http://192.168.1.151:8000
+  endpoint      : miniLM-onnx (Priority 1) -> http://192.168.1.151:8000/v2/models/miniLM-onnx/infer
+Ramp            : 1 -> 60 connections/endpoint, +5 per stage
+Stages          : 15 x 8.0s (+1.0s warmup each)
+Early stop      : failure rate >= 10%, or aggregate gain < 2% for 2 stages
+Server stats    : on
+Single endpoint : onnx
+Label           : qd0us (d82b02600e88)
+==========================================================
+
+[stage   1]    1 conn/endpoint | aggregate   256.2 rps | failures   0.0% | avg batch 1.00
+[stage   2]    6 conn/endpoint | aggregate   541.8 rps | failures   0.0% | avg batch 2.00
+[stage   3]    8 conn/endpoint | aggregate   541.1 rps | failures   0.0% | avg batch 2.00
+[stage   4]   11 conn/endpoint | aggregate   540.1 rps | failures   0.0% | avg batch 2.00
+
+Workers | Endpoint                   |     OK |  Fail |  Fail% |      RPS |  Mean ms |   p50 ms |   p95 ms |   p99 ms |  AvgBS
+------------------------------------------------------------------------------------------------------------------------------
+      1 | miniLM-onnx (Priority 1)   |   2050 |     0 |   0.0% |    256.2 |      3.9 |      3.9 |      4.7 |      4.9 |   1.00
+      1 | AGGREGATE                  |        |       |        |    256.2
+------------------------------------------------------------------------------------------------------------------------------
+      6 | miniLM-onnx (Priority 1)   |   4334 |     0 |   0.0% |    541.8 |     11.0 |     11.0 |     11.5 |     11.8 |   2.00
+      6 | AGGREGATE                  |        |       |        |    541.8
+------------------------------------------------------------------------------------------------------------------------------
+      8 | miniLM-onnx (Priority 1)   |   4329 |     0 |   0.0% |    541.1 |     14.7 |     14.7 |     15.2 |     15.5 |   2.00
+      8 | AGGREGATE                  |        |       |        |    541.1
+------------------------------------------------------------------------------------------------------------------------------
+     11 | miniLM-onnx (Priority 1)   |   4321 |     0 |   0.0% |    540.1 |     20.3 |     20.3 |     21.1 |     21.4 |   2.00
+     11 | AGGREGATE                  |        |       |        |    540.1
+------------------------------------------------------------------------------------------------------------------------------
+
+Ramp finished in 46.2s after 4 stage(s).
+Stop reason: aggregate throughput stopped improving (<2% for 2 consecutive stages) at 11 connections/endpoint
+Peak aggregate throughput: 541.8 rps at 6 connections/endpoint
+
+CSV  : experiments/20261029-233449/exp-12_pending/ramp-results.csv
+PNG  : experiments/20261029-233449/exp-12_pending/ramp-throughput.png
+PNG  : experiments/20261029-233449/exp-12_pending/ramp-latency.png
+PNG  : experiments/20261029-233449/exp-12_pending/ramp-errors.png
+PNG  : experiments/20261029-233449/exp-12_pending/ramp-batch-size.png
+PNG  : experiments/20261029-233449/exp-12_pending/ramp-summary.png
+JSON : experiments/20261029-233449/exp-12_pending/run.json
+STATS: experiments/20261029-233449/exp-12_pending/stats.deltas.json

@@ -1,0 +1,28 @@
+{
+  "max_batch_size": {
+    "from": 128,
+    "to": 32
+  },
+  "dynamic_batching.preferred_batch_size": {
+    "from": [
+      2,
+      4,
+      8,
+      16,
+      24,
+      32,
+      48,
+      64,
+      96,
+      128
+    ],
+    "to": [
+      2,
+      4,
+      8,
+      16,
+      24,
+      32
+    ]
+  }
+}

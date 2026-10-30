@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "label": "qd500us (0881984427cd)",
+  "started_at": "2026-10-29T23:53:59.254520+00:00",
+  "finished_at": "2026-10-29T23:54:56.937298+00:00",
+  "elapsed_seconds": 57.683,
+  "git_sha": "cd36270",
+  "run": {
+    "base_url": "http://192.168.1.151:8000",
+    "schedule": [
+      1,
+      6,
+      8,
+      11,
+      16
+    ],
+    "stage_duration_seconds": 8.0,
+    "warmup_seconds": 1.0,
+    "start_workers": 1,
+    "worker_increment": 5,
+    "max_workers": 60,
+    "thresholds": {
+      "plateau_threshold": 0.02,
+      "plateau_stages_required": 2,
+      "failure_stop_rate": 0.1,
+      "min_requests_per_stage": 20
+    }
+  },
+  "endpoints": [
+    {
+      "key": "onnx",
+      "model": "miniLM-onnx",
+      "url": "http://192.168.1.151:8000/v2/models/miniLM-onnx/infer",
+      "headers": {
+        "X-Amzn-SageMaker-Target-Model": "miniLM-onnx"
+      }
+    }
+  ],
+  "result": {
+    "stages_measured": 5,
+    "stop_reason": "aggregate throughput stopped improving (<2% for 2 consecutive stages) at 16 connections/endpoint",
+    "peak_aggregate_rps": 663.25,
+    "peak_workers": 16,
+    "rps_at_reference_concurrency": {
+      "8": 641.875,
+      "16": 663.25,
+      "32": null
+    },
+    "per_endpoint_peak": {
+      "onnx": {
+        "model": "miniLM-onnx",
+        "peak_rps": 663.25,
+        "workers": 16,
+        "p50_ms": 24.01,
+        "p99_ms": 25.429,
+        "avg_batch_size": 14.84788029925187
+      }
+    }
+  }
+}

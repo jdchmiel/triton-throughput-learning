@@ -1,0 +1,16 @@
+{
+  "instance_group": {
+    "from": [
+      [
+        1,
+        "KIND_GPU"
+      ]
+    ],
+    "to": [
+      [
+        4,
+        "KIND_GPU"
+      ]
+    ]
+  }
+}
