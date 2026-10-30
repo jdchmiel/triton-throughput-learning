@@ -258,3 +258,23 @@ To actually cap Triton, use docker `--cpuset-cpus=0-7`. Cross-validated the
 sampler against `top` on the server: 0.4% vs 0.5% idle. Worth remembering that
 `--http-thread-count` defaults to **8**, which may itself cap an `ic8` sweep —
 raise it to 16 before blaming the model for an `ic8` plateau.
+
+---
+
+## 2026-10-30 — `--http-thread-count=16` added to `run_triton.sh`
+
+Follow-up to the thread-default finding above. `triton-models/run_triton.sh` now
+passes `--http-thread-count=16` (Triton's default is 8). Each in-flight HTTP
+request occupies one thread from that pool, so at the default the server cannot
+have more than 8 requests being read, parsed, and written at once regardless of
+how many model instances are loaded — which would have capped the
+`instance_group.count` sweep at exactly the point it gets interesting (ic8+) and
+looked like a model plateau. 16 matches the server's core count.
+
+Reminder recorded in the script's header comment: this raises a **thread** count,
+not a core count. Triton has no core-count flag; the real cap is docker
+`--cpuset-cpus=0-7`.
+
+Takes effect on the next `run_triton.sh` restart, which means a server restart —
+so it must be done before campaign #2, not during it. Still gated on restoring
+the gigabit link.

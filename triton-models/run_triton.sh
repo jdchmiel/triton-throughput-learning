@@ -16,6 +16,16 @@
 #                                   without demanding every field be on disk.
 # -p 8002:8002 publishes the Prometheus metrics endpoint, which is where
 # nv_inference_pending_request_count (queue depth) lives.
+#
+# --http-thread-count=16 — the HTTP/1.1 worker pool defaults to **8**
+# (src/command_line_parser.h: `http_thread_cnt_{8}`). Each in-flight request
+# occupies one of these threads, so with the default the server cannot have
+# more than 8 concurrent requests being read/parsed/written no matter how many
+# model instances exist. That silently caps the campaign exactly where the
+# instance_group.count sweep gets interesting (ic8 and above) — the plateau
+# would be the thread pool, not the model. Set to 16 to match the server's
+# core count. There is no flag that sets a CPU *core* count; to actually limit
+# cores Triton may use, add --cpuset-cpus=0-7 to the docker run line.
 
 docker run --gpus all --rm -it \
   -p 8000:8000 \
@@ -32,4 +42,5 @@ docker run --gpus all --rm -it \
     --model-control-mode=explicit \
     --load-model='*' \
     --strict-model-config=false \
+    --http-thread-count=16 \
     --rate-limit=execution_count --log-verbose=1
