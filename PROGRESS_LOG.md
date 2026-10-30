@@ -152,3 +152,109 @@ invariant.
   and `qd25000us` rejected at +0.98%, and we cannot yet say how much of either
   was run-to-run variance. Measuring that spread is the cheapest way to make
   every future verdict more trustworthy.
+
+---
+
+## 2026-10-30 — Per-stage telemetry, and it caught a 100 Mbps link immediately
+
+### What was added
+
+`system_metrics.py` samples **CPU per core**, **network utilisation against link
+speed**, and **server VRAM** on both machines during every ramp stage, and
+`ramp-up.py` prints a summary line under each stage and writes `system.json`
+plus 12 new CSV columns. The server is sampled by piping one self-contained
+Python program to `ssh 7700x python3 -`, which loops remotely and returns raw
+jiffies and byte counters as JSON — one ssh handshake per stage rather than per
+sample. Nothing in it can fail a run: every path degrades to
+`{"available": false, "error": ...}`.
+
+The point of the whole thing is attribution. A plateau at 620 rps and a plateau
+at 620 rps because the NIC is full are the same number, and only the second one
+means the config search is over.
+
+### Headline: the client link is negotiating at 100 Mbps, not gigabit
+
+The first instrumented run flagged it on the peak stage:
+
+```
+client: enx00e04c6803f3 at 98.1% of a 100 Mbps link
+```
+
+Throughput is now **flat at ~620 rps** across 8, 16, and 17 connections (618.2 /
+622.1 / 621.8) with the wire pinned at 12.9 MB/s. The interface is a Realtek
+**RTL8153 Gigabit** Ethernet Adapter (`lsusb`: `0bda:8153`, driver `r8152`)
+reporting `speed=100`, `duplex=full`, `carrier=1`. A gigabit-capable part
+negotiated down to fast ethernet.
+
+A raw transfer over ssh confirms the pipe rather than the model: 200 MiB of
+`/dev/zero` server-to-client took 18.07 s = **11.1 MB/s (88 Mbps)**, and the NIC
+counter moved 209 MiB for 200 MiB sent, so the counters are honest.
+
+**This overturns the answer I gave earlier in this project that the network was
+not the bottleneck.** It was true when it was said; it is not true now.
+
+### The link was gigabit during campaign #1 — verified false that it always was
+
+Campaign #1's 2435.25 rps at ~19 kB of wire bytes per response (see the gzip
+finding below) needs **374 Mbps**, which 100 Mbps cannot carry. So the
+negotiation changed between 2026-10-29 and 2026-10-30 — cable, switch port, or
+the adapter re-negotiating after a replug. Nothing in the repo changed.
+
+The practical consequence: **campaign #2 must not be trusted until the link is
+restored.** Every `ic6`/`ic8`/`ic10`/`ic12` result will be network-capped at
+~620 rps and will look like a model-config plateau. Check the cable (Cat5e or
+better, and all four pairs — 100BASE-TX works with only two), try a different
+switch port, or force it with `ethtool -s enx00e04c6803f3 speed 1000 duplex full
+autoneg on`.
+
+### Why exactly 620 rps: gzip is on, and it is worth 2x
+
+Responses are 38714 B of JSON at the application layer, but aiohttp sends
+`Accept-Encoding: gzip` by default and Triton honours it:
+
+```
+Accept-Encoding='gzip'  ->  wire=18705  decoded=38714  ratio=0.483
+```
+
+Float-heavy JSON compresses roughly 2x. That resolved an anomaly that looked
+like a broken counter for most of this session — app bytes (23.9 MB/s) were
+almost exactly 2x NIC bytes (12.2 MB/s) at high rate while agreeing at low rate.
+Both were correct; one is post-decompression, the other is the wire.
+
+With 18705 B response + 293 B request + ~200 B headers = ~19.2 kB per request:
+
+| link | ceiling | measured |
+|---|---|---|
+| 100 Mbps | 651 rps | **622 rps = 95.5% of it** |
+| 1000 Mbps | 6511 rps | — |
+
+The plateau is the wire, to within 5%. Uncompressed the same link would cap at
+319 rps, so gzip is currently worth about 2x and is *not* a cost worth
+removing. Note this also means the binary-protocol item in the README gets
+*less* urgent than it looked, not more: binary output would remove the JSON
+text before compression, but gzip already recovers most of that on the wire.
+Binary's remaining win is server CPU, not bytes.
+
+### Client is not the ceiling (yet), and a classifier bug fixed on the way
+
+At the plateau the client's busiest core averages **76%**, aggregate 24%; the
+server is at 8% aggregate with one core at 64%. Neither is pinned, so the
+620 rps is not the harness. The earlier `cores_at_95pct` used per-core *max*,
+which fired "1 core(s) at >=95%" on a transient spike under 8% aggregate load —
+a false bottleneck claim. `classify()` now uses a new
+`cores_sustained_95pct` (per-core *mean* >= 95, i.e. pinned for the whole
+stage); the max-based count is still recorded for the CSV. Watch the client's
+busiest core on the next gigabit run — at 2400 rps it may well pin, which is the
+open README question.
+
+### Triton thread defaults, from the core-count question
+
+No flag sets a core count. From `src/command_line_parser.h`:
+`http_thread_cnt_{8}`, `buffer_manager_thread_count 0`,
+`model_load_thread_count 4`, `grpc-infer-thread-count 2`,
+`sagemaker-thread-count 8`. `--host-policy=<n>,cpu-cores=` only applies to
+instances that declare that host policy, so it would break the load-API configs.
+To actually cap Triton, use docker `--cpuset-cpus=0-7`. Cross-validated the
+sampler against `top` on the server: 0.4% vs 0.5% idle. Worth remembering that
+`--http-thread-count` defaults to **8**, which may itself cap an `ic8` sweep —
+raise it to 16 before blaming the model for an `ic8` plateau.

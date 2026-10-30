@@ -24,6 +24,14 @@ statistics (`GET /v2/models/{name}/stats`) around each stage and records the
 server-side view: realised average batch size, and the queue-vs-compute split.
 That is the evidence the dynamic-batching experiments are actually about.
 
+Throughput alone cannot say *what* limited a stage, so every stage is also
+instrumented with `system_metrics.py`: per-core CPU on both machines, VRAM and
+GPU utilisation on the server, and network throughput against each interface's
+negotiated link speed on both. A plateau at 620 rps with a 100 Mbps link at 98%
+is a network result, not a model result, and only the telemetry distinguishes
+them. Pass `--server-ssh <host>` to sample the Triton box too; without it only
+the local machine is measured. See `system.json` and the `bottleneck` field.
+
 Dependencies: aiohttp, matplotlib
 """
 
@@ -43,6 +51,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import aiohttp
+
+import system_metrics
 
 import matplotlib
 
@@ -92,6 +102,16 @@ POLL_INTERVAL_SECONDS = 0.01    # how often an idle worker checks for a new stag
 # an "after" snapshot taken immediately under-counts the tail of the stage.
 # Triton's own QA retries for up to 10s; this is the settle window we allow.
 STATS_SETTLE_SECONDS = 2.0
+
+# --- SYSTEM TELEMETRY --------------------------------------------------------
+# How the box is configured, discovered by probing rather than assumed:
+#   client  elitebuntu24  12 cores, reaches the server over enx00e04c6803f3,
+#           a USB adapter negotiating 100 Mbps (NOT gigabit -- see PROGRESS_LOG)
+#   server  7700x         16 cores, enp12s0 at 1000 Mbps, RTX 3080 10240 MiB
+# The asymmetry is the point: the server can push 1 Gbps into a 100 Mbps pipe.
+SERVER_SSH_HOST = "7700x"           # '' disables server sampling
+SYSTEM_SAMPLE_INTERVAL = 1.0        # seconds between per-core CPU / net samples
+GPU_SAMPLE_INTERVAL = 2.0           # nvidia-smi costs ~50ms, so sample it less
 
 # --- OUTPUT ------------------------------------------------------------------
 OUTPUT_DIR = Path("ramp-results")
@@ -192,6 +212,10 @@ class RunConfig:
     collect_stats: bool = True
     stats_settle_seconds: float = STATS_SETTLE_SECONDS
     plot_dpi: int = PLOT_DPI
+    collect_system: bool = True
+    server_ssh: str = SERVER_SSH_HOST
+    system_interval: float = SYSTEM_SAMPLE_INTERVAL
+    gpu_interval: float = GPU_SAMPLE_INTERVAL
 
     def endpoints(self) -> list:
         all_endpoints = build_endpoints(self.base_url, self.target_header)
@@ -245,6 +269,29 @@ def parse_args(argv=None) -> RunConfig:
         default=STATS_SETTLE_SECONDS,
         help="seconds to wait after a stage so Triton's async stats catch up",
     )
+    parser.add_argument(
+        "--no-system",
+        dest="collect_system",
+        action="store_false",
+        help="skip per-stage CPU / VRAM / network sampling",
+    )
+    parser.add_argument(
+        "--server-ssh",
+        default=SERVER_SSH_HOST,
+        help="ssh host of the Triton box for CPU/VRAM/net sampling; '' for local only",
+    )
+    parser.add_argument(
+        "--system-interval",
+        type=float,
+        default=SYSTEM_SAMPLE_INTERVAL,
+        help="seconds between CPU/network samples within a stage",
+    )
+    parser.add_argument(
+        "--gpu-interval",
+        type=float,
+        default=GPU_SAMPLE_INTERVAL,
+        help="seconds between nvidia-smi samples on the server",
+    )
     args = parser.parse_args(argv)
 
     return RunConfig(
@@ -265,6 +312,10 @@ def parse_args(argv=None) -> RunConfig:
         only=args.only,
         collect_stats=args.collect_stats,
         stats_settle_seconds=args.stats_settle,
+        collect_system=args.collect_system,
+        server_ssh=args.server_ssh.strip(),
+        system_interval=args.system_interval,
+        gpu_interval=args.gpu_interval,
     )
 
 
@@ -544,6 +595,40 @@ async def worker(session: aiohttp.ClientSession, endpoint: Endpoint, state: Stag
         await fire_one(session, endpoint, counters, state)
 
 
+def system_line(system_by_machine: dict) -> str:
+    """One live-progress line summarising what limited a stage.
+
+    Format: cpu = aggregate% with pegged-core count in brackets, net = MB/s
+    with link utilisation, vram = used MiB. A saturated resource is flagged
+    inline so a bottleneck is visible while the ramp is still running.
+    """
+    if not system_by_machine.get("available"):
+        return "system: (not sampled)"
+    parts = []
+    for side, short in (("client", "client"), ("server", "server")):
+        machine = system_by_machine.get(side)
+        if not machine or not machine.get("available"):
+            parts.append(f"{short}: n/a")
+            continue
+        text = f"{short} cpu {machine['cpu_aggregate_pct']:.0f}%"
+        if machine.get("cores_at_95pct"):
+            text += f" [{machine['cores_at_95pct']} pegged]"
+        primary = machine.get("net_primary") or {}
+        if primary.get("iface"):
+            text += f" | net {primary.get('total_MBps', 0):.1f} MB/s"
+            if primary.get("util_pct") is not None:
+                text += f" ({primary['util_pct']:.0f}% of {primary['link_mbps']}M"
+                text += ", SATURATED)" if primary.get("saturated") else ")"
+        parts.append(text)
+        if side == "server" and machine.get("vram_used_mib") is not None:
+            parts[-1] += f" | vram {machine['vram_used_mib']:.0f} MiB"
+    line = " ; ".join(parts)
+    signals = (system_by_machine.get("bottleneck") or {}).get("signals") or []
+    if signals:
+        line += "  <-- " + "; ".join(signals)
+    return line
+
+
 def print_stage_table(stage_rows: list, endpoints: list) -> None:
     """Render the accumulated per-stage metrics as a fixed-width report."""
     header = (
@@ -552,7 +637,7 @@ def print_stage_table(stage_rows: list, endpoints: list) -> None:
     )
     print("\n" + header)
     print("-" * len(header))
-    for workers, metrics_by_key, aggregate_rps, stats_by_key in stage_rows:
+    for workers, metrics_by_key, aggregate_rps, stats_by_key, _system in stage_rows:
         for endpoint in endpoints:
             m = metrics_by_key[endpoint.key]
             stats = stats_by_key.get(endpoint.key) or {}
@@ -578,11 +663,16 @@ def write_csv(path: Path, stage_rows: list, endpoints: list) -> None:
         "requests_per_second", "mean_ms", "p50_ms", "p95_ms", "p99_ms", "max_ms", "top_errors",
         "triton_inference_count", "triton_execution_count", "avg_batch_size",
         "queue_ns", "compute_infer_ns", "batch_distribution",
+        # System telemetry is per stage, not per endpoint, so it lands on the
+        # aggregate row only. See system.json for the full per-core detail.
+        "client_cpu_pct", "client_cores_pegged", "client_net_MBps", "client_net_util_pct",
+        "server_cpu_pct", "server_cores_pegged", "server_net_MBps", "server_net_util_pct",
+        "server_vram_MiB", "server_gpu_util_pct", "bottleneck",
     ]
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
-        for workers, metrics_by_key, aggregate_rps, stats_by_key in stage_rows:
+        for workers, metrics_by_key, aggregate_rps, stats_by_key, system_by_machine in stage_rows:
             for endpoint in endpoints:
                 m = metrics_by_key[endpoint.key]
                 stats = stats_by_key.get(endpoint.key) or {}
@@ -626,8 +716,36 @@ def write_csv(path: Path, stage_rows: list, endpoints: list) -> None:
                     "requests_per_second": f"{aggregate_rps:.3f}",
                     "mean_ms": "", "p50_ms": "", "p95_ms": "", "p99_ms": "", "max_ms": "",
                     "top_errors": "",
+                    **system_csv_fields(system_by_machine),
                 }
             )
+
+
+def system_csv_fields(system_by_machine: dict) -> dict:
+    """Flatten one stage's telemetry into CSV columns (empty when unsampled)."""
+    blank = {
+        "client_cpu_pct": "", "client_cores_pegged": "", "client_net_MBps": "",
+        "client_net_util_pct": "", "server_cpu_pct": "", "server_cores_pegged": "",
+        "server_net_MBps": "", "server_net_util_pct": "", "server_vram_MiB": "",
+        "server_gpu_util_pct": "", "bottleneck": "",
+    }
+    if not system_by_machine.get("available"):
+        return blank
+    out = {}
+    for side in ("client", "server"):
+        machine = system_by_machine.get(side) or {}
+        prefix = f"{side}_"
+        out[prefix + "cpu_pct"] = machine.get("cpu_aggregate_pct", "")
+        out[prefix + "cores_pegged"] = machine.get("cores_at_95pct", "")
+        primary = machine.get("net_primary") or {}
+        out[prefix + "net_MBps"] = primary.get("total_MBps", "")
+        out[prefix + "net_util_pct"] = primary.get("util_pct", "")
+        if side == "server":
+            out["server_vram_MiB"] = machine.get("vram_used_mib", "")
+            out["server_gpu_util_pct"] = machine.get("gpu_util_pct", "")
+    signals = (system_by_machine.get("bottleneck") or {}).get("signals") or []
+    out["bottleneck"] = "; ".join(signals)
+    return out
 
 
 def plot_results(stage_rows: list, stop_reason: str, output_dir: Path, endpoints: list, dpi: int = PLOT_DPI) -> list:
@@ -758,12 +876,22 @@ async def run_ramp(cfg: RunConfig) -> tuple:
     """Drive the staged ramp and return (stage rows, stop reason).
 
     Each stage row is ``(workers, metrics_by_endpoint, aggregate_rps,
-    triton_stats_by_endpoint)``. The last entry holds server-side deltas from
-    Triton's ``/stats`` and is ``{"available": False}`` when stats are off.
+    triton_stats_by_endpoint, system_by_machine)``. The stats entry holds
+    server-side deltas from Triton's ``/stats`` and is ``{"available": False}``
+    when stats are off; the system entry holds per-core CPU, VRAM and network
+    telemetry for both machines.
     """
     endpoints = cfg.endpoints()
     schedule = build_stage_schedule(cfg.start_workers, cfg.worker_increment, cfg.max_workers)
     total_connections = cfg.max_workers * len(endpoints)
+
+    # Which of our interfaces actually carries the traffic. Sampling every
+    # interface and summing would hide a saturated link among idle ones.
+    server_ip = cfg.base_url.split("//")[-1].split(":")[0]
+    route_iface = system_metrics.detect_route_iface(server_ip)
+    if cfg.collect_system:
+        print(f"System sampling : local + {cfg.server_ssh or 'none'} "
+              f"every {cfg.system_interval}s (route iface: {route_iface or 'unknown'})")
 
     connector = aiohttp.TCPConnector(
         limit=total_connections + 16,
@@ -817,10 +945,30 @@ async def run_ramp(cfg: RunConfig) -> tuple:
                 while time.perf_counter() < warmup_until:
                     await asyncio.sleep(0.02)
 
+                # Telemetry starts after warmup so the numbers describe the
+                # measured window only, and the remote probe is sized to match
+                # the window exactly (it self-terminates, no signal needed).
+                system_by_machine = {"available": False}
+                sampler = None
+                if cfg.collect_system:
+                    sampler = system_metrics.StageSampler(
+                        interval=cfg.system_interval,
+                        ssh_host=cfg.server_ssh,
+                        duration=cfg.stage_duration,
+                        gpu_interval=cfg.gpu_interval,
+                        primary_iface=route_iface,
+                    )
+                    sampler.start()
+
                 state.measure_start = measure_start
                 state.measure_deadline = measure_deadline
                 while time.perf_counter() < measure_deadline:
+                    if sampler is not None:
+                        sampler.tick()
                     await asyncio.sleep(0.05)
+
+                if sampler is not None:
+                    system_by_machine = await sampler.finish()
 
                 # Close the window before reading counters so late responses that
                 # started inside the window are not attributed to this stage.
@@ -850,7 +998,7 @@ async def run_ramp(cfg: RunConfig) -> tuple:
                 else:
                     stats_by_key = {endpoint.key: {"available": False} for endpoint in endpoints}
 
-                stage_rows.append((level, metrics, aggregate_rps, stats_by_key))
+                stage_rows.append((level, metrics, aggregate_rps, stats_by_key, system_by_machine))
 
                 total_failures = sum(metrics[endpoint.key].failures for endpoint in endpoints)
                 total_requests = total_failures + sum(metrics[endpoint.key].successes for endpoint in endpoints)
@@ -868,6 +1016,7 @@ async def run_ramp(cfg: RunConfig) -> tuple:
                     f"[stage {index:>3}] {level:>4} conn/endpoint | aggregate {aggregate_rps:7.1f} rps | "
                     f"failures {stage_failure_rate * 100:5.1f}%{batch_txt}"
                 )
+                print(f"           {system_line(system_by_machine)}")
 
                 # --- Early-stop rule 1: too many failures ---------------------
                 if stage_failure_rate >= cfg.failure_stop_rate:
@@ -924,7 +1073,7 @@ def git_sha() -> str:
 def rps_at_reference_levels(stage_rows: list, endpoints: list) -> dict:
     """Aggregate RPS at each reference concurrency, when that stage ran."""
     levels = {}
-    for workers, metrics_by_key, aggregate_rps, _stats in stage_rows:
+    for workers, metrics_by_key, aggregate_rps, _stats, _system in stage_rows:
         levels[workers] = round(aggregate_rps, 3)
     return {
         str(level): levels.get(level) for level in REFERENCE_CONCURRENCIES
@@ -940,9 +1089,63 @@ def write_stats_json(path: Path, stage_rows: list, endpoints: list) -> None:
                 endpoint.key: stats_by_key.get(endpoint.key, {}) for endpoint in endpoints
             },
         }
-        for workers, _metrics, _aggregate, stats_by_key in stage_rows
+        for workers, _metrics, _aggregate, stats_by_key, _system in stage_rows
     ]
     path.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def write_system_json(path: Path, stage_rows: list) -> None:
+    """Persist the full per-stage telemetry, including per-core CPU arrays.
+
+    Kept in its own file rather than folded into run.json: the per-core arrays
+    make it far larger than the headline numbers, and campaign.py only reads
+    run.json.
+    """
+    payload = [
+        {"workers": workers, "aggregate_rps": round(aggregate, 3), "system": system_by_machine}
+        for workers, _metrics, aggregate, _stats, system_by_machine in stage_rows
+    ]
+    path.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def system_summary(stage_rows: list) -> dict:
+    """Condensed telemetry for run.json: one row per stage plus the peak stage.
+
+    The full per-core arrays live in system.json. This exists so a reader (or
+    campaign.py) can answer "was this run limited by something other than the
+    model?" without opening a second file.
+    """
+    stages = []
+    for workers, _metrics, aggregate, _stats, system in stage_rows:
+        if not system.get("available"):
+            continue
+        row = {"workers": workers, "rps": round(aggregate, 1)}
+        for side in ("client", "server"):
+            machine = system.get(side) or {}
+            if not machine.get("available"):
+                continue
+            primary = machine.get("net_primary") or {}
+            row[f"{side}_cpu_pct"] = machine.get("cpu_aggregate_pct")
+            row[f"{side}_cores_pegged"] = machine.get("cores_at_95pct")
+            row[f"{side}_net_MBps"] = primary.get("total_MBps")
+            row[f"{side}_net_util_pct"] = primary.get("util_pct")
+            if side == "server":
+                row["server_vram_MiB"] = machine.get("vram_used_mib")
+                row["server_gpu_util_pct"] = machine.get("gpu_util_pct")
+        row["signals"] = (system.get("bottleneck") or {}).get("signals") or []
+        stages.append(row)
+    if not stages:
+        return {"available": False}
+    # The stage that set the peak throughput is the one worth reading first —
+    # note that is not necessarily the stage with the most connections.
+    peak_row = max(stages, key=lambda r: r["rps"])
+    return {
+        "available": True,
+        "stages": stages,
+        "any_saturated": any(stage["signals"] for stage in stages),
+        "stages_saturated": sum(1 for stage in stages if stage["signals"]),
+        "peak_stage": peak_row,
+    }
 
 
 def write_run_json(
@@ -996,6 +1199,7 @@ def write_run_json(
             "peak_workers": peak[0] if peak else None,
             "rps_at_reference_concurrency": rps_at_reference_levels(stage_rows, endpoints),
             "per_endpoint_peak": per_endpoint_peak,
+            "system": system_summary(stage_rows),
         },
     }
     path.write_text(json.dumps(payload, indent=2) + "\n")
@@ -1020,6 +1224,11 @@ def main(argv=None) -> int:
     print(f"Early stop      : failure rate >= {cfg.failure_stop_rate * 100:.0f}%, or aggregate gain "
           f"< {cfg.plateau_threshold * 100:.0f}% for {cfg.plateau_stages} stages")
     print(f"Server stats    : {'on' if cfg.collect_stats else 'off'}")
+    if cfg.collect_system:
+        print(f"System metrics  : local + {cfg.server_ssh or 'none'} "
+              f"(cpu/core, vram, net vs link speed) every {cfg.system_interval}s")
+    else:
+        print("System metrics  : off")
     if cfg.only:
         print(f"Single endpoint : {cfg.only}")
     if cfg.label:
@@ -1045,6 +1254,18 @@ def main(argv=None) -> int:
 
     peak = max(stage_rows, key=lambda row: row[2])
     print(f"Peak aggregate throughput: {peak[2]:.1f} rps at {peak[0]} connections/endpoint")
+    print(f"Peak stage resources     : {system_line(peak[4])}")
+
+    # A run where every stage hit some ceiling cannot rank model configs — say
+    # so loudly rather than letting the numbers stand unqualified.
+    saturated = [row for row in stage_rows if (row[4].get("bottleneck") or {}).get("saturated")]
+    if saturated and len(saturated) == len(stage_rows):
+        print(
+            f"\nWARNING: all {len(stage_rows)} stages reported a saturated resource. "
+            "Throughput here is limited by hardware, not by the model config."
+        )
+    elif saturated:
+        print(f"\nNote: {len(saturated)}/{len(stage_rows)} stages reported a saturated resource.")
 
     # Never clobber an earlier run: if the directory already holds results,
     # keep both by moving this one into a timestamped subdirectory.
@@ -1070,6 +1291,11 @@ def main(argv=None) -> int:
         stats_path = output_dir / "stats.deltas.json"
         write_stats_json(stats_path, stage_rows, endpoints)
         print(f"STATS: {stats_path}")
+
+    if cfg.collect_system:
+        system_path = output_dir / "system.json"
+        write_system_json(system_path, stage_rows)
+        print(f"SYSTM: {system_path}")
 
     return 0
 
