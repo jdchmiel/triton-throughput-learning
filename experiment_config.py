@@ -63,7 +63,13 @@ PREFERRED_BATCH_SIZE_SETS = {
 
 QUEUE_DELAY_MICROSECONDS = [0, 500, 2000, 5000, 10000, 25000]
 
-INSTANCE_COUNTS = [1, 2, 3, 4]
+# Campaign #1 plateaued on this dimension rather than saturating it: ic1 651 ->
+# ic2 1301 -> ic3 1881 -> ic4 2435 rps, still climbing ~25% per doubling when
+# the sweep ran out of values. 6 and 8 extend the only knob that ever moved.
+# VRAM is the constraint to watch — each instance is a full copy of the model
+# (86 MB on disk) plus its own activations, so ic8 is well under 1 GB of the
+# 3080's 10 GB but is no longer trivially free.
+INSTANCE_COUNTS = [1, 2, 3, 4, 6, 8]
 
 
 @dataclass(frozen=True)

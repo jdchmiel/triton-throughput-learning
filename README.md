@@ -54,7 +54,46 @@ Covered by `campaign.py` (it sweeps these automatically):
   realised batch size so you can see whether more copies beat a longer queue
   delay rather than guessing.
 
-Still to do:
+Still to do, in rough order of expected payoff (see `PROGRESS_LOG.md` for the
+measurements behind this ordering):
+
+- **Switch the harness to Triton's binary protocol.** The single biggest lever
+  left. Every response is 1920 FP32 values rendered as JSON *text* (~27 KB vs
+  7.7 KB raw), and the server spends ~2 ms of CPU per request on that
+  serialisation — measured, not guessed: 674 rps costs ~1.3 cores and 2429 rps
+  costs ~5.2 cores on a 16-core box, linear in requests rather than in batch
+  size. Use `Inference-Header-Content-Length` with raw binary input/output. It
+  cuts wire bytes ~3.5x, removes the server CPU wall, and stops the client
+  parsing ~4.7M floats/second. New campaign: the payload is a fixed variable.
+- **Confirm the client is not the ceiling.** At 2435 rps `ramp-up.py` parses
+  ~2435 x 1920 floats per second in Python on one core. If it ever pins a core,
+  the peak is an underestimate of the server. Check before trusting any further
+  throughput gains; the binary protocol above mostly fixes it.
+- **Measure the run-to-run noise floor.** The ratchet keeps a config at +2%, but
+  campaign #1 accepted `pbs:mid` at +3.6% and rejected `qd25000us` at +0.98%
+  with no idea how much of either was noise. Re-run one config 5 times and take
+  the spread. Until that is known, treat anything under ~3% as a tie.
+- **Record VRAM as instance count climbs.** `GET /stats` reports
+  `memory_usage[].byte_size` per model. Campaign #1 never looked at it, and the
+  next campaign pushes `instance_group.count` to 8. Cheap to capture, and it is
+  the one failure mode (OOM on reload) that could invalidate a winning config.
+- **Vary the inputs.** Every request in the harness is byte-identical, which is
+  unrealistically friendly: it maximises cacheability, and the batching gains
+  are measured on identical 5-token sequences. Send real, varied token lengths
+  and re-measure. This is also the prerequisite for any honest cache experiment.
+- **Response cache A/B.** Verified OFF today (see `PROGRESS_LOG.md`), and our
+  workload is 100% duplicate requests, so it would look spectacular — which is
+  exactly why it should be measured deliberately rather than stumbled into.
+  `--cache-config local,size=...` plus `response_cache { enable: true }`, then
+  read `cache_hit.count` from `/stats`. Run it on varied inputs or the number is
+  meaningless.
+- **ONNX Runtime execution settings.** `optimization` and
+  `graph_execution_order` in the config, plus the ORT graph-opt level. A
+  batch-of-7.2 costing 6.6x a batch-of-1 says this model is launch-overhead-bound
+  at 5 tokens, not FLOP-bound — CUDA graphs are the fix worth testing.
+- **`model_warmup`.** Currently empty, so the first requests after every reload
+  pay deferred initialisation. The campaign discards that with `--warmup`, but
+  production would not, and it makes the first stage of each ramp noisy.
 - Adjust the docker run command to use the SageMaker `serve` wrapper instead of
   Triton directly. This changes the server, so it has to be its own campaign.
 - Serve a larger embedding model than miniLM-L6-v2. Also a separate campaign,
