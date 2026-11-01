@@ -623,3 +623,29 @@ Two things that would mislead a reader here:
 
 `CLAUDE.md` carries the same generated block and still contains the `bd dolt
 push` step, so an agent reading that file instead is still told to run it.
+
+---
+
+## 2026-11-01 — Claude Code integration removed
+
+The previous entry ended by flagging `CLAUDE.md` as an unresolved inconsistency:
+it still carried the `bd dolt push` step. Resolved by deleting it rather than
+patching it, because the user works in VS Code and does not use Claude Code.
+
+Both `CLAUDE.md` and `.claude/settings.json` arrived via `bd init` (commit
+`15a4abb`), not by hand. `.claude/settings.json` contained only `SessionStart`
+and `PreCompact` hooks running `bd prime` — Claude Code lifecycle events that
+never fire under VS Code, so the file was inert. Deleting only `CLAUDE.md` would
+have left that orphan behind, which is why both went.
+
+Worth noting for anyone who re-runs `bd setup`: `bd setup claude --remove` does
+*not* delete the files. It strips the beads section from `CLAUDE.md` and empties
+the hooks object, leaving a 389-byte template stub and `{"hooks": {}}`. The
+removal had to be finished with `git rm`. `bd setup claude --check` afterwards
+reports "Global hooks installed" pointing at `~/.claude/settings.json` — that is
+outside the repo and was left untouched, so a future agent should not read that
+line as evidence the repo integration is still wanted.
+
+Nothing in the repo referenced `CLAUDE.md`, so no other file needed updating.
+`AGENTS.md` is the instruction file VS Code and Copilot actually read, and it is
+the one place the beads sync override needs to live.
