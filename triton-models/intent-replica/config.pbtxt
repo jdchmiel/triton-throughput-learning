@@ -1,0 +1,69 @@
+# Intent-classifier replica: utterance in, best corpus match out.
+#
+# Faithful to the production shape -- HF torch encoder plus a numpy cosine
+# search over a server-side corpus, returning a variable-length string
+# rather than a tensor. The corpus lives in 1/ and is loaded once per
+# instance, so it never appears in a request.
+#
+# The python backend has no torch in the Triton image, so it borrows the
+# existing miniLM virtualenv instead of shipping a second 3 GB copy.
+
+name: "intent-replica"
+backend: "python"
+max_batch_size: 128
+
+dynamic_batching {
+  preferred_batch_size: [ 2, 4, 8, 16, 32, 64, 128 ]
+  max_queue_delay_microseconds: 5000
+}
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
+
+parameters: {
+  key: "EXECUTION_ENV_PATH"
+  value: { string_value: "/opt/ml/model/miniLM/minilm_env.tar.gz" }
+}
+
+# COSINE_DEVICE: "cpu" reproduces production; "cuda" is the A/B that shows
+# whether the retrieval stage is what leaves the GPU idle.
+# TORCH_THREADS: pins the CPU thread pool so multi-instance runs do not
+# oversubscribe the host. 0 leaves torch's default in place.
+parameters: {
+  key: "COSINE_DEVICE"
+  value: { string_value: "cpu" }
+}
+parameters: {
+  key: "TORCH_THREADS"
+  value: { string_value: "0" }
+}
+
+input [
+  {
+    name: "TEXT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  }
+]
+
+output [
+  {
+    name: "MATCH"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "INTENT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "SCORE"
+    data_type: TYPE_FP32
+    dims: [ 1 ]
+  }
+]
