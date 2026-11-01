@@ -9,8 +9,29 @@ bd ready              # Find available work
 bd show <id>          # View issue details
 bd update <id> --claim  # Claim work atomically
 bd close <id>         # Complete work
-bd dolt push          # Push beads data to remote
 ```
+
+## Beads Sync Model (this repo)
+
+**Do not run `bd dolt push`.** This repo has no Dolt remote and needs none.
+
+Issues are shared through the single flat file `.beads/issues.jsonl`, which is
+tracked by git. A `pre-commit` hook exports the database into that file and
+stages it on every commit, so **`git push` is the only sync step** — beads data
+travels with the rest of the repo. There is no second datastore to keep in step.
+
+Edit issues with `bd`, never by hand. `bd` writes its working database and the
+hook regenerates the JSONL; hand-editing the JSONL will be overwritten by the
+next `bd` write.
+
+You will still see `bd dolt push` suggested by `bd prime`, `bd onboard`, and the
+generated block at the bottom of this file. Those are bd's stock templates, not
+this repo's configuration. Ignore the command; running it only prints a
+"supported remote URLs" error, because the configured remote is the placeholder
+`git+ssh://git@github.com/org/repo.git`.
+
+If beads data ever looks out of sync, the fix is `bd export` followed by a
+commit — not a dolt push.
 
 ## Non-Interactive Shell Commands
 
@@ -106,10 +127,11 @@ bd close <id>         # Complete work
 4. **PUSH TO REMOTE** - This is MANDATORY:
    ```bash
    git pull --rebase
-   bd dolt push
    git push
    git status  # MUST show "up to date with origin"
    ```
+   No `bd dolt push` — see "Beads Sync Model" above. The `pre-commit` hook has
+   already exported beads into `.beads/issues.jsonl`, so this push carries it.
 5. **Clean up** - Clear stashes, prune remote branches
 6. **Verify** - All changes committed AND pushed
 7. **Hand off** - Provide context for next session
