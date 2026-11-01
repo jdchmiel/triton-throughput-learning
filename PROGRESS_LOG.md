@@ -446,12 +446,13 @@ with `nvidia-smi dmon -s um` during load by `tools/measure.sh`, which reports
 throughput, GPU utilisation and batch size together so a future run cannot
 repeat this mistake.
 
-At conc=16 the ratio was **5.98**: Triton was happily grouping six requests per
-call. But `execute()` was written `for request in requests:` — the faithful
-production shape — so it looped over the group and did the encoder call and the
-full corpus read **once per request**. The scheduler's batching was real and
-completely wasted. Every throughput number reported before this point was
-measuring the unbatched path regardless of what the config asked for.
+At conc=16 the ratio was **about six** (5.6–6.0 across repeat runs): Triton was
+happily grouping six requests per call. But `execute()` was written
+`for request in requests:` — the faithful production shape — so it looped over
+the group and did the encoder call and the full corpus read **once per request**.
+The scheduler's batching was real and completely wasted. Every throughput number
+reported before this point was measuring the unbatched path regardless of what
+the config asked for.
 
 ### Batching is the dominant lever, not the cosine device
 
@@ -460,39 +461,77 @@ comparison) encodes and retrieves the whole group at once: N corpus reads and N
 encoder launches become one of each. Verified to return **byte-identical** scores
 to the per-request path before it was measured.
 
-RTX 3080, conc=16, 20s windows, identical payloads:
+RTX 3080, conc=16, 20s windows, identical payloads. Every row below was
+re-measured from a cold reload with the loaded config confirmed via
+`GET /v2/models/intent-replica/config`:
 
 | cosine | batch | instances | rps | p50 | GPU sm avg (max) | GPU mem avg |
 |---|---|---|---|---|---|---|
-| cpu | off | 1 | 157 | 100 ms | **22%** (27%) | 8% |
-| cpu | off | 2 | 123 | 129 ms | 22% (33%) | 7% |
-| cpu | on | 1 | 396 | 38 ms | 12% (20%) | 4% |
-| cuda | off | 1 | 314 | 51 ms | 44% (54%) | 21% |
-| cuda | off | 2 | 419 | 38 ms | **77%** (97%) | 28% |
-| cuda | on | 1 | **1671** | **9 ms** | 41% (51%) | 17% |
-| cuda | on | 2 | 1390 | 12 ms | 69% (89%) | 23% |
+| cpu | off | 1 | 157 | 99.7 ms | **21%** (28%) | 8% |
+| cpu | off | 2 | 125 | 126.7 ms | 21% (33%) | 7% |
+| cpu | on | 1 | 373 | 41.4 ms | 11% (18%) | 4% |
+| cuda | off | 1 | 422 | 37.7 ms | **77%** (97%) | 29% |
+| cuda | off | 2 | 426 | 37.5 ms | **77%** (97%) | 29% |
+| cuda | on | 1 | **1677** | **9.5 ms** | 41% (52%) | 18% |
+| cuda | on | 2 | 1392 | 12.0 ms | 70% (87%) | 23% |
 
-Pushing concurrency on the best config: conc=32 gives 2661 rps at 14.7 rows/exec,
-conc=64 gives **3726 rps** at 28.2 rows/exec with GPU sm still only **52%**.
+Pushing concurrency on the best config: conc=32 gives 2766 rps at 14.8 rows/exec
+and 47% sm; conc=64 gives **3754 rps** at 28.2 rows/exec with GPU sm still only
+**52%**.
 
-Three conclusions, two of which correct earlier statements:
+Two rows in the first version of this table were wrong and are corrected above.
+`cuda / off / 1` was written as 314 rps at 44% sm; it is actually **422 rps at
+77% sm**. `cuda / off / 2` was written as 419 rps; it is 426. I cannot now
+reconstruct exactly which measurement produced the old pair — the sweep that
+produced them predated `tools/measure.sh`, and the `sed`-against-a-container-path
+trap below was active during part of it, which is enough to make any row from
+that run untrustworthy. The corrected numbers change two of the conclusions,
+which is why they are recorded rather than quietly fixed: **if a sweep was run
+before the harness reported the loaded config alongside the result, re-run it
+before citing it.**
+
+`rows/exec` is the noisiest column in this data (5.63 vs 5.98 across identical
+runs). Treat it as "roughly six" rather than a precise quantity: it is a
+diagnostic for *whether* the scheduler is grouping requests, not a metric to
+optimise. Throughput and utilisation were stable to within a percent or two.
+
+Four conclusions, two of which correct statements I made earlier:
 
 1. **The production shape reproduces the low utilisation under investigation:
-   22% SM, 8% GPU memory, 157 rps.** That is the number the GPU-spend question
+   21% SM, 8% GPU memory, 157 rps.** That is the number the GPU-spend question
    turns on, and it is reproduced with the encoder untouched.
-2. **Batching is worth 5.3x; moving cosine to the GPU is worth 2.0x.** I had
-   presented the CPU-vs-GPU cosine A/B as the headline. It is the *second* lever.
-3. **A second instance hurts once batching is on** (1671 → 1390 rps). One batched
-   instance already keeps the GPU fed; the second process duplicates the 113 MB
-   corpus and contends for the PCIe link. My earlier "2 instances is the knee"
-   was only true for the unbatched path.
+2. **Batching is the dominant lever; GPU cosine is the second one.** Best config
+   versus the production shape is 157 → 1677 rps, a **10.7x** combined gain, but
+   that conflates two changes. Isolating each at fixed conditions: batching alone
+   is 2.4x on CPU cosine (157 → 373) and **4.0x** on GPU cosine (422 → 1677),
+   while moving cosine to the GPU alone is 2.7x (157 → 422). I had presented the
+   CPU-vs-GPU cosine A/B as the headline; it is the smaller lever. Note also that
+   batching helps *more* once cosine is on the GPU — with cosine still on CPU the
+   batched corpus read is the limit, since 373 rps x 113 MB is about 42 GB/s of
+   host memory bandwidth.
+3. **A second instance is worth nothing here, and costs memory.** With GPU cosine
+   unbatched, 1 → 2 instances is a tie (422 → 426 rps) while framebuffer use
+   climbs. Once batching is on it is actively worse (1677 → 1392 rps), because
+   one batched instance already keeps the GPU fed and the second process
+   duplicates the 113 MB corpus. My earlier "2 instances is the knee" was an
+   artefact of measuring the unbatched path.
+4. **High GPU utilisation is not the goal, and chasing it is a trap.** The two
+   `cuda / off` rows saturate the GPU at **77% avg, 97% max** and deliver ~424
+   rps. The batched single instance runs at **41% sm** and delivers **1677 rps** —
+   four times the throughput on half the utilisation. Utilisation measures how
+   busy the SMs are, not how much useful work completes per request. Since the
+   question behind this project is whether the employer is over-spending on GPUs,
+   say it plainly: the production shape sits at 21% sm because each request does
+   its own corpus read and encoder launch, and the fix (batching) *lowers*
+   reported utilisation while multiplying throughput. Anyone tuning toward a
+   greener utilisation graph will pick the 4x-slower config.
 
 ### Reconciling with campaign #1, which said batching barely helped
 
 Campaign #1 found `max_batch_size` flat-to-worse and concluded batching bought
 ~11% compute efficiency, with `instance_group.count` doing all the work. That
-still stands, and it is not in conflict with the 5.3x above — the two runs are
-measuring different bottlenecks.
+still stands for the model it measured, and it is not in conflict with the 4.0x
+above — the two runs are measuring different bottlenecks.
 
 Campaign #1 drove `miniLM-onnx` at `TOKEN_COUNT = 5`, and its own per-execution
 table shows why: a batch of 7.2 cost 6.6x a batch of 1, i.e. nearly linear,
@@ -507,14 +546,45 @@ sweep result about `max_batch_size` is a statement about the model's cost
 structure, not a general property of Triton — do not carry a "batching doesn't
 help" conclusion from one model to the next.
 
+The same caution runs the other way. Campaign #1 concluded
+`instance_group.count` was the only knob that mattered, and on `intent-replica`
+a second instance is a tie unbatched and a 17% loss batched. Instance count
+helps when one instance cannot keep the device busy; it stops helping, and
+starts costing duplicated model state, as soon as it can. Both campaigns are
+correct about their own model and neither result transfers.
+
 ### What would mislead a reader of these numbers
 
 - Payloads rotate through 5 short utterances, so the encoder sees unrealistically
   uniform input. Query length 10-25 tokens is the highest-value remaining sweep
   precisely because the encoder, not retrieval, is now the ceiling.
 - The earlier hypothesis that CPU cosine is memory-bandwidth-bound (113 MB/request
-  ≈ 17 GB/s at 155 rps) does explain the production shape's 22% utilisation, but
-  it is **not the binding constraint once batching is on**. At 3726 rps with GPU at
+  ≈ 17 GB/s at 157 rps) does explain the production shape's 21% utilisation, but
+  it is **not the binding constraint once batching is on**. At 3754 rps with GPU at
   52%, the encoder is the ceiling.
 - Config on the host is left at the faithful production default: `cpu`, batch off,
   1 instance.
+
+### Measurement traps, three of which cost real time
+
+These are worth keeping together because each one produces *confident, wrong*
+output rather than an error.
+
+- **`nvidia-smi dmon -s um` column order.** It is
+  `gpu sm mem enc dec jpg ofa fb bar1 ccpm`, so sm is `$2`, mem is `$3`, fb is
+  `$8`, and the header occupies two lines. An awk filter keyed on the wrong column
+  silently samples idle rows.
+- **awk compares strings unless you force numbers.** `if (sm > max)` where both
+  look numeric does a *string* comparison, so `"9" > "22"` and every `max` in the
+  report is wrong — it can come out too high or too low depending on the digits
+  seen, which is what makes it so hard to notice. Write `sm=$2+0` first.
+- **Never `sed` a container path from the host.** `sed -i /opt/ml/model/...`
+  operates on a host path that does not exist, fails, and leaves the config
+  unchanged — so a whole sweep comes back suspiciously uniform. Either `docker
+  exec sed` or edit the host path under `/AI/models/triton/`. It recurred while
+  writing this entry: a `sed` pattern written against `KEY { string_value: ... }`
+  matched nothing because keys and values are on separate lines in
+  `config.pbtxt`. The guard is to `grep` the file after editing, and better still
+  to confirm the *loaded* config with
+  `GET /v2/models/<name>/config`, which reports what the server is actually
+  running rather than what the file says.
