@@ -42,6 +42,11 @@ class TritonPythonModel:
         params = self._params(args)
 
         self.cosine_device = params.get("COSINE_DEVICE", "cpu")
+        # Off by default: looping per request is what the production python
+        # wrapper does, so the default reproduces it. Turning this on measures
+        # what the already-happening dynamic batching is worth if it is
+        # actually exploited.
+        self.batch_across_requests = params.get("BATCH_ACROSS_REQUESTS", "false") == "true"
         threads = int(params.get("TORCH_THREADS", "0"))
         if threads > 0:
             torch.set_num_threads(threads)
@@ -72,6 +77,7 @@ class TritonPythonModel:
         pb_utils.Logger.log_info(
             f"intent-replica ready: {len(self.corpus)} rows, "
             f"cosine={self.cosine_device}, torch_threads={threads or 'default'}, "
+            f"batch_across_requests={self.batch_across_requests}, "
             f"load={time.time() - t0:.2f}s"
         )
 
@@ -128,28 +134,57 @@ class TritonPythonModel:
         return idx, sims[idx, np.arange(len(queries))]
 
     def execute(self, requests):
+        if self.batch_across_requests:
+            return self._execute_batched(requests)
         responses = []
         for request in requests:
-            in_tensor = pb_utils.get_input_tensor_by_name(request, "TEXT")
-            raw = in_tensor.as_numpy()
-            # Preserve the incoming shape so a dynamically batched request
-            # still returns one output row per input row.
-            shape = raw.shape
-            texts = [t.decode("utf-8") if isinstance(t, bytes) else str(t)
-                     for t in raw.flatten()]
-
-            queries = self._encode(texts)
-            idx, scores = self._retrieve(queries)
-
-            matches = np.array([self.corpus_texts[i] for i in idx], dtype=object)
-            intents = np.array([self.corpus_labels[i] for i in idx], dtype=object)
-
-            responses.append(pb_utils.InferenceResponse(output_tensors=[
-                pb_utils.Tensor("MATCH", matches.reshape(shape)),
-                pb_utils.Tensor("INTENT", intents.reshape(shape)),
-                pb_utils.Tensor("SCORE", scores.astype(np.float32).reshape(shape)),
-            ]))
+            texts, shape = self._decode(request)
+            responses.append(self._respond(texts, shape))
         return responses
+
+    @staticmethod
+    def _decode(request):
+        in_tensor = pb_utils.get_input_tensor_by_name(request, "TEXT")
+        raw = in_tensor.as_numpy()
+        texts = [t.decode("utf-8") if isinstance(t, bytes) else str(t)
+                 for t in raw.flatten()]
+        return texts, raw.shape
+
+    def _respond(self, texts, shape):
+        queries = self._encode(texts)
+        idx, scores = self._retrieve(queries)
+        return self._make_response(idx, scores, shape)
+
+    def _execute_batched(self, requests):
+        """Encode and retrieve once for the whole request group.
+
+        Dynamic batching already groups requests before execute() is called,
+        but looping over them one at a time throws that work away: each row
+        pays its own encoder call and its own full corpus read. Concatenating
+        turns N corpus reads into one and N small GPU launches into one.
+        """
+        decoded = [self._decode(r) for r in requests]
+        texts = [t for chunk, _ in decoded for t in chunk]
+        queries = self._encode(texts)
+        idx, scores = self._retrieve(queries)
+
+        responses = []
+        offset = 0
+        for _, shape in decoded:
+            n = int(np.prod(shape)) if shape else 1
+            responses.append(self._make_response(
+                idx[offset:offset + n], scores[offset:offset + n], shape))
+            offset += n
+        return responses
+
+    def _make_response(self, idx, scores, shape):
+        matches = np.array([self.corpus_texts[i] for i in idx], dtype=object)
+        intents = np.array([self.corpus_labels[i] for i in idx], dtype=object)
+        return pb_utils.InferenceResponse(output_tensors=[
+            pb_utils.Tensor("MATCH", matches.reshape(shape)),
+            pb_utils.Tensor("INTENT", intents.reshape(shape)),
+            pb_utils.Tensor("SCORE", scores.astype(np.float32).reshape(shape)),
+        ])
 
     def finalize(self):
         pass

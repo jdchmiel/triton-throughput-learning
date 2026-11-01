@@ -42,6 +42,15 @@ parameters: {
   value: { string_value: "0" }
 }
 
+# BATCH_ACROSS_REQUESTS: "false" reproduces production, where the python
+# wrapper handles one request per execute() call. "true" encodes and
+# retrieves the whole dynamic batch at once, which turns N corpus reads and
+# N encoder launches into one of each.
+parameters: {
+  key: "BATCH_ACROSS_REQUESTS"
+  value: { string_value: "false" }
+}
+
 input [
   {
     name: "TEXT"
