@@ -36,6 +36,44 @@ cp -rf source dest          # NOT: cp -r source dest
 - `apt-get` - use `-y` flag
 - `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
 
+## Progress Log (REQUIRED)
+
+`PROGRESS_LOG.md` is the durable record of what this project has measured and
+concluded. **Keep it up to date as you work — do not wait until the end of a
+session to write it up.**
+
+**Append-only.** New entries go at the **bottom**. Never rewrite or delete
+anything above; if an earlier entry turns out to be wrong, add a new entry that
+corrects it and says so explicitly. Corrected mistakes are the most valuable
+content in this file.
+
+**Append an entry when any of these happen:**
+
+- A campaign or sweep finishes and produces numbers.
+- A measurement settles, or overturns, an open question.
+- A bug changes how existing results should be read.
+- A Q&A or investigation establishes a fact worth keeping.
+- You discover a measurement methodology trap that could mislead a future run.
+
+**Each entry should contain:**
+
+1. A `## YYYY-MM-DD — short descriptive title` heading.
+2. **The numbers**, as a table, with the conditions that produced them
+   (concurrency, instance count, payload, hardware). A number without its
+   conditions is not reproducible and will be misread later.
+3. **Why**, not just what. Prose over bullet-spam. A future reader needs the
+   reasoning to know when the conclusion stops applying.
+4. **What would mislead** — caveats, known-unrealistic parts of the setup, and
+   any earlier belief this entry corrects.
+
+**Do not** put task tracking in it. `bd` owns tasks and issues; this file owns
+findings. A todo list in the progress log will go stale and contradict `bd`.
+
+**During session close**, before pushing, confirm every finding from the session
+is recorded. If you measured something worth keeping and it is not in
+`PROGRESS_LOG.md`, write it up — that is part of "Hand off context for the next
+session" in the workflow below.
+
 <!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
 ## Beads Issue Tracker
 

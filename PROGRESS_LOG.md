@@ -278,3 +278,243 @@ not a core count. Triton has no core-count flag; the real cap is docker
 Takes effect on the next `run_triton.sh` restart, which means a server restart —
 so it must be done before campaign #2, not during it. Still gated on restoring
 the gigabit link.
+
+---
+
+## 2026-11-01 — BERT config fixed, and embeddings without a Python wrapper
+
+Two things landed here that are easy to lose: why the original config was
+broken, and why the embeddings path ended up being graph surgery rather than a
+Python wrapper.
+
+### The config bug, and the trick that found it
+
+`bert-base-uncased` failed to load with `tensor 'logits': the model expects 3
+dimensions (shape [-1,-1,30522]) but the model configuration specifies 2
+dimensions`. The cause is a rule that is easy to forget: when
+`max_batch_size > 0`, the config's `dims` **excludes** the batch dimension. So
+`dims: [ -1 ]` was being read as complete shape `[-1,-1]`, not `[-1,-1,-1]`.
+Fix was `output.dims: [ -1 ]` → `[ -1, 30522 ]`.
+
+Worth keeping is *how* the real signature was obtained. `onnx` and
+`onnxruntime` are both unimportable in the container and in `/AI/triton/my_env`,
+so reading the graph by hand was not available. Instead: bind-mount **only** the
+`1/` version directory into a scratch model repo with **no** `config.pbtxt`, let
+Triton auto-complete the config from the model itself, then
+`GET /v2/models/<name>/config`. Triton reports the authoritative answer. Far
+more reliable than guessing dims from docs.
+
+Two environment traps found on the way: symlinks inside a bind-mounted model
+repo break with a misleading `failed to stat file /opt/ml/model/...` because the
+link target does not exist inside the container — bind-mount the real directory.
+And a `vim config.pbtxt` left open on the host holds the pre-fix buffer, so a
+later `:w` silently reverts the fix.
+
+### Embeddings: trimmed the ONNX graph instead of wrapping it
+
+The question was whether to switch to safetensors plus a Python wrapper to get
+embeddings out. Neither, and the reasons were measured rather than assumed:
+there are **no** bert-base-uncased safetensors anywhere on the host, and the
+Python wrapper path costs a **3.0 GB** `minilm_env.tar.gz` execution environment
+per model.
+
+Graph inspection showed the model is `BertForMaskedLM` (1266 nodes, opset 11,
+204 initializers, no pooler node), ending at
+`/cls/predictions/decoder/MatMul`. So the waste is the 30522-way vocab head, not
+where pooling happens. `trim_to_embeddings.py` re-anchors the graph output to
+`last_hidden_state` (`/bert/encoder/layer.11/output/LayerNorm/Add_1_output_0`)
+and appends attention-masked mean pooling in-graph.
+
+Deployed as a **separate** model (`bert-base-uncased-embed`) so the working MLM
+config stayed untouched, then hot-loaded through the explicit-mode load API with
+no server restart. Validated against a PyTorch reference:
+
+| check | result |
+|---|---|
+| max abs error vs PyTorch | 1.669e-06 |
+| padding invariance | 0.000e+00 |
+| MLM nodes remaining | 0 |
+| response size at seq 128 | ~350x smaller |
+
+The padding-invariance check is the one that matters. A mean-pooling node that
+ignores `attention_mask` produces plausible embeddings for a single unpadded
+request and quietly wrong ones for any padded batch — which is exactly the case a
+throughput harness creates. That same class of bug reappears below, so it is
+worth treating "verify padding invariance" as a standing gate for this project.
+
+---
+
+## 2026-11-01 — intent-replica: the corpus lives server-side, and two silent bugs
+
+The harness up to this point benchmarked **only the encoder**. The workload being
+reproduced at work is BERT encode + cosine similarity against a corpus + return
+the matched corpus string, so `triton-models/intent-replica/` now reproduces that
+shape. Design decisions that came from the user and should not be relitigated:
+the corpus is **server-side model state and never appears in a request**; a
+request is one user utterance and the response is the matched line; cosine is a
+**numpy dot product on CPU** because that is what production does; the encoder is
+**HF torch in the python backend** for the same reason.
+
+Corpus built from banking77 (train+test) and CLINC150 (`imbalanced`
+train/validation/test + `plus` train):
+
+| property | value |
+|---|---|
+| unique utterances | 36,912 |
+| distinct intents | 227 |
+| `corpus.npy` | 36,912 x 768 float32, 113.4 MB |
+| vector norms | min 1.000000, max 1.000000 |
+| exact self-match | 99.98% |
+| median runner-up similarity | 0.9162 |
+| encode rate (3080) | ~2,500 utt/s |
+
+Because vectors are stored unit-length, serving cosine is a bare `corpus @ q`
+with no normalisation on the hot path.
+
+### Bug 1: an embedded newline silently misaligned the corpus
+
+`corpus.txt` had **36,914 lines for 36,913 vectors**. One banking77 utterance
+contains a literal newline, so a line-oriented index file gained a row and every
+subsequent row pointed at the wrong vector and label. Nothing raised. The
+argmax would still have returned a confident, plausible, wrong string.
+
+Fixed at the root by normalising whitespace (`" ".join(text.split())`) during
+dedupe, which also merged a whitespace-only duplicate — hence 36,913 → 36,912.
+Backstopped twice: the builder re-reads its own output and asserts one line per
+vector, and `initialize()` refuses to load unless
+`len(vectors) == len(texts) == len(labels)`.
+
+### Bug 2: mean pooling let padding leak in
+
+Self-match scored **0.926**, not 1.0. The pooling was
+`hidden.sum(1) / mask.sum(1)`, but BERT's hidden states at pad positions are
+**non-zero**, so unmasked `sum` adds garbage and only the *count* is masked. The
+error scales with how much padding the batch contains, so build-time (256-row
+batches) and serving-time (1-row requests) drifted into **different vector
+spaces**. Correct form is `(hidden * mask).sum(1) / mask.sum(1)`.
+
+The lesson is in how it was caught. The existing self-check compared batched
+vectors against each other, so it could never see this — both sides had the same
+padding error. The check that catches it re-encodes a sample **one row at a
+time**, which is what a single-row request does:
+
+```
+single-row vs batched agreement min=1.000000 median=1.000000
+```
+
+After the fix, `./test-intent.sh --check` returns the input line at score
+exactly 1.0. Standing rule for this project: **a retrieval model that returns
+plausible strings and plausible latency is not verified.** Assert a known-input
+self-match at 1.0 before trusting any throughput number built on it, because a
+silent argmax or alignment bug is invisible in latency data.
+
+### Cost of the server-side corpus, stated up front
+
+Each Triton python-backend instance is its own process, so the 113 MB corpus is
+multiplied by `instance_group.count` and cold start grows with it. Do not read a
+slow `POST /v2/models/intent-replica/load` as a hang. This is the same scaling
+production pays, so it belongs in the report rather than being optimised away.
+
+`minilm_env.tar.gz` is reused via `EXECUTION_ENV_PATH` pointing at the **other**
+model's copy. Legal — it is just a file path — and saves a second 3 GB
+environment.
+
+Container paths trip this up more than once. The whole model repository is
+bind-mounted, so host `/AI/models/triton` maps to container `/opt/ml/model` and
+a model's files land at `/opt/ml/model/<model>/<version>/`. The corpus is
+therefore `/opt/ml/model/intent-replica/1/corpus.npy`, **not**
+`/opt/ml/model/corpus.npy`. `docker exec triton find / -name corpus.npy` settles
+a path question in a few seconds and beats guessing — worth reaching for before
+writing a script that loads a file by hand.
+
+---
+
+## 2026-11-01 — GPU utilisation measured, and the batching I had reported was fake
+
+Asked two questions about the numbers above: what was the GPU utilisation, and
+did the sweep include batching alongside instance counts. The honest answers were
+"not measured" and "no", so both were measured properly. Doing it properly
+overturned a conclusion I had already reported.
+
+### Reading batch size from Triton, not from config
+
+`config.pbtxt` says `dynamic_batching` is on. That is not evidence batching
+happens, and not evidence it *helps*. The real number is
+`nv_inference_request_success / nv_inference_exec_count` from `:8002/metrics` —
+how many requests the scheduler actually grouped per `execute()` call. Sampled
+with `nvidia-smi dmon -s um` during load by `tools/measure.sh`, which reports
+throughput, GPU utilisation and batch size together so a future run cannot
+repeat this mistake.
+
+At conc=16 the ratio was **5.98**: Triton was happily grouping six requests per
+call. But `execute()` was written `for request in requests:` — the faithful
+production shape — so it looped over the group and did the encoder call and the
+full corpus read **once per request**. The scheduler's batching was real and
+completely wasted. Every throughput number reported before this point was
+measuring the unbatched path regardless of what the config asked for.
+
+### Batching is the dominant lever, not the cosine device
+
+`BATCH_ACROSS_REQUESTS` (default `false`, preserving the faithful production
+comparison) encodes and retrieves the whole group at once: N corpus reads and N
+encoder launches become one of each. Verified to return **byte-identical** scores
+to the per-request path before it was measured.
+
+RTX 3080, conc=16, 20s windows, identical payloads:
+
+| cosine | batch | instances | rps | p50 | GPU sm avg (max) | GPU mem avg |
+|---|---|---|---|---|---|---|
+| cpu | off | 1 | 157 | 100 ms | **22%** (27%) | 8% |
+| cpu | off | 2 | 123 | 129 ms | 22% (33%) | 7% |
+| cpu | on | 1 | 396 | 38 ms | 12% (20%) | 4% |
+| cuda | off | 1 | 314 | 51 ms | 44% (54%) | 21% |
+| cuda | off | 2 | 419 | 38 ms | **77%** (97%) | 28% |
+| cuda | on | 1 | **1671** | **9 ms** | 41% (51%) | 17% |
+| cuda | on | 2 | 1390 | 12 ms | 69% (89%) | 23% |
+
+Pushing concurrency on the best config: conc=32 gives 2661 rps at 14.7 rows/exec,
+conc=64 gives **3726 rps** at 28.2 rows/exec with GPU sm still only **52%**.
+
+Three conclusions, two of which correct earlier statements:
+
+1. **The production shape reproduces the low utilisation under investigation:
+   22% SM, 8% GPU memory, 157 rps.** That is the number the GPU-spend question
+   turns on, and it is reproduced with the encoder untouched.
+2. **Batching is worth 5.3x; moving cosine to the GPU is worth 2.0x.** I had
+   presented the CPU-vs-GPU cosine A/B as the headline. It is the *second* lever.
+3. **A second instance hurts once batching is on** (1671 → 1390 rps). One batched
+   instance already keeps the GPU fed; the second process duplicates the 113 MB
+   corpus and contends for the PCIe link. My earlier "2 instances is the knee"
+   was only true for the unbatched path.
+
+### Reconciling with campaign #1, which said batching barely helped
+
+Campaign #1 found `max_batch_size` flat-to-worse and concluded batching bought
+~11% compute efficiency, with `instance_group.count` doing all the work. That
+still stands, and it is not in conflict with the 5.3x above — the two runs are
+measuring different bottlenecks.
+
+Campaign #1 drove `miniLM-onnx` at `TOKEN_COUNT = 5`, and its own per-execution
+table shows why: a batch of 7.2 cost 6.6x a batch of 1, i.e. nearly linear,
+because at 5 tokens that model is **launch-overhead-bound with almost no
+arithmetic to amortise**. There is nothing for a batch to share.
+
+`intent-replica` has a large fixed per-request cost that a batch *can* share: the
+113 MB corpus read and a fresh encoder launch per request. Batching amortises
+exactly that. So the project rule is: **batching helps in proportion to the
+per-request fixed cost, and does nothing for a small launch-bound model.** A
+sweep result about `max_batch_size` is a statement about the model's cost
+structure, not a general property of Triton — do not carry a "batching doesn't
+help" conclusion from one model to the next.
+
+### What would mislead a reader of these numbers
+
+- Payloads rotate through 5 short utterances, so the encoder sees unrealistically
+  uniform input. Query length 10-25 tokens is the highest-value remaining sweep
+  precisely because the encoder, not retrieval, is now the ceiling.
+- The earlier hypothesis that CPU cosine is memory-bandwidth-bound (113 MB/request
+  ≈ 17 GB/s at 155 rps) does explain the production shape's 22% utilisation, but
+  it is **not the binding constraint once batching is on**. At 3726 rps with GPU at
+  52%, the encoder is the ceiling.
+- Config on the host is left at the faithful production default: `cpu`, batch off,
+  1 instance.
