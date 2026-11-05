@@ -67,6 +67,62 @@ python analyze.py                                   # leaderboard + progress.png
 
 Results land in `experiments/<campaign-timestamp>/exp-<NN>_<peakRps>rps/`.
 
+## Stella 400M (single-model server)
+
+`stella400m` is the 400M-parameter Stella encoder (`NovaSearch/stella_en_400M_v5`)
+behind the Triton python backend: text in, unit-length 1024-d vector out. It is
+the encoder half of the `intent-replica` shape at 18x the size, so the GPU has
+real work to do. Read the docstring in `triton-models/stella400m/1/model.py`
+before touching the load path — it needs two transformers-5 shims and both fail
+*silently* (the model returns unit-length vectors that are nearly identical for
+every input).
+
+```bash
+# on the triton host: stella only, detached, polls until READY (~26s cold)
+triton-models/run_triton_stella.sh --bg
+triton-models/run_triton_stella.sh --stop
+
+# from anywhere: freeform, corpus-side (--passage skips the instruct prompt),
+# or the ranking gate
+./test-stella.sh "reset my password"
+./test-stella.sh --passage "Paris is the capital of France."
+HOST=http://localhost:8000 ./test-stella.sh --check   # run this ON the host
+```
+
+`--check` is a ranking test, not a shape test, because the two ways this model
+breaks (uninitialised rope buffers, the instruct prompt applied to both sides)
+are invisible in the output shape. It asserts a similarity gap > 0.2 between a
+matching and an unrelated passage.
+
+The repo holds `model.py`, `config.pbtxt` and the sweep tools; it does **not**
+hold the checkpoint. `1/model.py` loads from its own directory, so the host
+directory needs the HuggingFace files beside it:
+
+```bash
+# on the triton host
+huggingface-cli download NovaSearch/stella_en_400M_v5 \
+  --local-dir /AI/models/triton/stella400m/1
+```
+
+`configuration.py` and `modeling.py` are required (the checkpoint's `auto_map`
+points at them), plus `2_Dense_1024/` for the output head. Do not "fix"
+`config.json` to drop `use_memory_efficient_attention` / `unpad_inputs` —
+`model.py` already overrides both to `False`, because they need xformers, which
+the borrowed miniLM env does not have.
+
+The sweep is deliberately separate from `campaign.py` — it rewrites
+`config.pbtxt` and hot-reloads through the repository API:
+
+```bash
+# on the host, after copying tools/{sweep.sh,loadgen.py} to /tmp and
+# docker cp'ing loadgen.py into the container
+ROWS='ic2:on:2:16 ic4:on:4:64' bash /tmp/sweep.sh 20
+```
+
+Rows are `label:batching:count:concurrency`. Batch size comes from Triton's own
+counters, never from the config. See the 2026-11-05 `PROGRESS_LOG.md` entry for
+results and for why the ic1 ceiling is not the GPU.
+
 ## TODO things to test out
 
 Covered by `campaign.py` (it sweeps these automatically):

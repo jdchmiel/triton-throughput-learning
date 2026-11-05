@@ -649,3 +649,132 @@ line as evidence the repo integration is still wanted.
 Nothing in the repo referenced `CLAUDE.md`, so no other file needed updating.
 `AGENTS.md` is the instruction file VS Code and Copilot actually read, and it is
 the one place the beads sync override needs to live.
+
+---
+
+## 2026-11-05 — stella400m: two transformers-5 shims, and a failure that only shows up as bad math
+
+Goal was to stand up `NovaSearch/stella_en_400M_v5` as a second encoder behind
+Triton — the same intent shape as `intent-replica`, but at 400M parameters
+instead of 22M, so the GPU actually has something to do. Deliverables:
+`triton-models/stella400m/1/model.py`, its `config.pbtxt`, `test-stella.sh`,
+`triton-models/run_triton_stella.sh`, and a batching/instance sweep.
+
+### The bug that did not look like a bug
+
+The checkpoint ships its own `modeling.py` (1387 lines, byte-identical to
+upstream) and is loaded with `trust_remote_code=True`. Under transformers 5.x
+that path is built on the **meta device** and materialised with `to_empty()`,
+which does *not* re-run the `__init__` statements that fill buffers registered
+with `persistent=False`. Four buffers are affected, and they fail in two
+different ways:
+
+- `NewEmbeddings.position_ids` (an `arange`) came back as uninitialised memory.
+  `rope_cos[position_ids]` then gathered out of bounds and killed the process
+  with a CUDA device-side assert. Loud, easy.
+- `RotaryEmbedding.inv_freq` / `cos_cached` / `sin_cached` came back as memory
+  that *happened* to be in range. No crash. The model loaded, ran, returned
+  1024-d unit-length vectors. Every pairwise cosine landed in `0.999x` and the
+  ranking was **inverted** — unrelated text scored highest.
+
+The second one is the lesson. Nothing in the shape, the norms, or the logs was
+wrong; only the arithmetic was. `_repair_nonpersistent_buffers()` re-registers
+`position_ids` and re-runs `rope._set_cos_sin_cache()`, then returns the worst
+absolute error against an analytic NTK reference so the damage is visible at
+load time. Probing it directly: without the repair `max_err=1.000000` and all
+similarities ≈0.999; with it `max_err=0.000000` and the ranking is correct
+(Paris 0.8175 / cat 0.2218 / stocks 0.2549). `max_seq_len_cached` is a plain
+python int so it survives `to_empty()` and reports the 16384 the cache was
+originally built for.
+
+Two follow-on traps in the same area:
+
+- `get_extended_attention_mask` was **removed** from `PreTrainedModel` in v5 but
+  `modeling.py:904` still calls it. Monkeypatched back on, and it must default
+  `dtype` from the parameters — `modeling.py` passes `device=` and no `dtype`,
+  so `torch.finfo(None)` raises `TypeError`.
+- The rope tolerance has to be dtype-scaled. After the repair, `rope_cache_err`
+  is `1.08e-03` under fp16 and `0.0` under fp32. That fp16 number is pure cache
+  quantisation, but a flat `1e-3` threshold made a healthy model warn that
+  "embeddings will be degenerate". Tolerance is now `1e-2` for fp16, `1e-4`
+  otherwise.
+
+Because both failures are silent, `test-stella.sh --check` is a **ranking** gate,
+not a shape gate: query with the prompt, two passages without, assert 1024 dims,
+unit norm, `gap > 0.2`, and correct ordering. Current: match `0.7587`, apart
+`0.1809`, gap `0.5778`, PASS.
+
+### Stella is asymmetric, and prompting both sides collapses it
+
+The instruct prompt belongs on **queries only**. Applying it to both sides
+pushes every similarity into 0.96–0.9999 — the same degenerate signature as the
+rope bug, from a completely different cause. Worth remembering when debugging:
+two independent mistakes produce nearly identical symptoms. Server default is
+`PROMPT_MODE=always` (queries), and corpus indexing must use `PROMPT_MODE=never`
+or send `USE_PROMPT=0` per request.
+
+### Sweep: instance count is the lever again, on a 400M model
+
+RTX 3080, fp16, 20 s windows, load generator running *inside* the container.
+Batch size is Δ`nv_inference_request_success`/Δ`nv_inference_exec_count` scoped
+to `model="stella400m"`, never read off the config.
+
+| config | conc | rps | p50 | p99 | req/exec | GPU sm avg (max) | fb |
+|---|---|---|---|---|---|---|---|
+| batching off, ic1 | 1 | 110 | 8.98 ms | 10.40 ms | 1.00 | 36% (42%) | 1426 MB |
+| batching on, ic1 | 16 | 117 | 136.3 ms | 143.7 ms | 5.11 | 35% (42%) | 1426 MB |
+| batching on, ic1 | 64 | 116 | 553.1 ms | 562.8 ms | 9.24 | 35% (42%) | 1426 MB |
+| batching on, **ic2** | 16 | 212 | 74.7 ms | 132.1 ms | 4.16 | **82% (98%)** | 2549 MB |
+| batching on, **ic2** | 64 | 213 | 295.7 ms | 574.4 ms | 8.32 | 80% (99%) | 2549 MB |
+| batching on, **ic4** | 16 | **254** | 62.9 ms | 137.0 ms | 2.61 | **82% (100%)** | 4795 MB |
+| batching on, **ic4** | 64 | 254 | 221.3 ms | 864.9 ms | 6.57 | 81% (100%) | 4795 MB |
+
+1. **`instance_group.count` is the only knob that moves throughput**: 110 → 212
+   → 254 rps for ic1 → ic2 → ic4. That is campaign #1's conclusion (651 → 1301 →
+   1881 → 2435 on miniLM) reproduced on a model 18x larger, which makes it look
+   like a property of the python backend rather than of the tiny model.
+2. **One instance cannot use the GPU.** At ic1, sm is pinned near 35% no matter
+   how much pressure is applied — conc=64 produced *identical* throughput to
+   conc=16 (116 vs 117 rps) and just converted the surplus into latency
+   (p50 136 ms → 553 ms). That is a saturated queue, not a busy GPU. ic2 and ic4
+   sit at 80–82% sm, so the ceiling at ic1 is serialisation inside `execute()`,
+   not compute.
+3. **Dynamic batching genuinely fires here** (5.11 requests/exec at conc=16,
+   9.24 at conc=64) and still buys essentially nothing over the unbatched
+   baseline. Unlike `intent-replica`, where batching was the dominant lever,
+   stella's `execute()` already encodes the whole group in one forward pass, so
+   there is no per-request loop left to remove. Batching protects latency under
+   burst; it does not create throughput.
+4. **ic4 is the knee, and it is sublinear** (+92% then +20%), same shape as
+   campaign #1. ic4 at conc=16 is the best point on the board: highest rps *and*
+   the lowest p50 of any batched row. Memory is not the constraint (4795 MB of
+   10240).
+
+**These numbers are a readiness proof, not a benchmark.** They were taken over a
+slow wifi ssh link, and the flat ~110 rps at ic1 across three different configs
+is exactly the signature of a client-side ceiling. The ic2/ic4 gains are real
+because the *GPU utilisation* moved with them (35% → 82%), which a client limit
+cannot cause. Re-run on the 1 Gb switch before quoting any absolute rps.
+
+### Harness fixes, all found by the harness lying to me
+
+- Three of the five original sweep rows were the *same* config (`batching=on
+  count=1 conc=16`), so the table had a duplicate masquerading as three
+  experiments. Rows are now `label:batching:count:conc` strings behind a `ROWS`
+  env var. The duplication was accidentally useful — three identical rows within
+  ~1% is the noise floor — but it was not designed, it was caught.
+- `sweep.sh` rewrites the whole `config.pbtxt` per row rather than `sed`-ing it,
+  because `key:` and `value:` sit on separate lines and patterns written against
+  `KEY { ... }` match nothing, silently measuring the previous config. It now
+  stashes `config.pbtxt.orig` and restores that, so a sweep no longer strips the
+  knob documentation out of the live config.
+- `awk` needs `$2+0` when reading `dmon`; without it the comparison is string
+  based and the reported max is wrong.
+- `test-stella.sh` now reports `ERROR: empty response from server` instead of a
+  `JSONDecodeError` traceback. Over wifi, `curl -s` returns an empty body and the
+  traceback reads like a model failure. Run `--check` on the host with
+  `HOST=http://localhost:8000`; the laptop link is not reliable enough to gate
+  on.
+- Long remote sweeps must be `setsid nohup`'d to a file. One run lost its output
+  to `Connection reset by peer` mid-sweep; the server was fine and the results
+  were simply gone.

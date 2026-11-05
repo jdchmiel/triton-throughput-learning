@@ -1,0 +1,85 @@
+# Stella 400M (NovaSearch/stella_en_400M_v5) embedding encoder.
+#
+# Text in, unit-length 1024-d vector out. This is the encoder half of the
+# production intent shape -- pair it with intent-replica to get the full
+# utterance -> corpus-match pipeline at 400M scale.
+#
+# The python backend has no torch in the Triton image, so it borrows the
+# existing miniLM virtualenv rather than shipping a second 3 GB copy. That env
+# carries transformers 5.x, which needs the two compatibility shims in
+# 1/model.py; see the module docstring before changing the load path.
+#
+# Sweep knobs live in parameters so a campaign can rewrite them without
+# touching model.py:
+#   DTYPE               float16 (default) | float32
+#   PROMPT_MODE         always (queries) | never (corpus indexing)
+#   ATTN_IMPLEMENTATION "" (eager, what the checkpoint was trained with) | sdpa
+#   MAX_LENGTH          tokenizer truncation cap
+#   TORCH_THREADS       pins the CPU thread pool for multi-instance runs
+
+name: "stella400m"
+backend: "python"
+max_batch_size: 128
+
+dynamic_batching {
+  preferred_batch_size: [ 2, 4, 8, 16, 32, 64, 128 ]
+  max_queue_delay_microseconds: 5000
+}
+
+instance_group [
+  {
+    count: 1
+    kind: KIND_GPU
+  }
+]
+
+parameters: {
+  key: "EXECUTION_ENV_PATH"
+  value: { string_value: "/opt/ml/model/miniLM/minilm_env.tar.gz" }
+}
+
+parameters: {
+  key: "DTYPE"
+  value: { string_value: "float16" }
+}
+
+# Stella is asymmetric: the instruct prompt goes on queries only. A corpus
+# index built with PROMPT_MODE=always must not be compared against prompts
+# applied at query time. Deployments that index separately want a second
+# model entry pointing at this same directory with PROMPT_MODE=never.
+parameters: {
+  key: "PROMPT_MODE"
+  value: { string_value: "always" }
+}
+
+parameters: {
+  key: "MAX_LENGTH"
+  value: { string_value: "512" }
+}
+
+parameters: {
+  key: "TORCH_THREADS"
+  value: { string_value: "0" }
+}
+
+input [
+  {
+    name: "TEXT"
+    data_type: TYPE_STRING
+    dims: [ 1 ]
+  },
+  {
+    name: "USE_PROMPT"
+    data_type: TYPE_BOOL
+    dims: [ 1 ]
+    optional: true
+  }
+]
+
+output [
+  {
+    name: "EMBEDDING"
+    data_type: TYPE_FP32
+    dims: [ 1024 ]
+  }
+]
