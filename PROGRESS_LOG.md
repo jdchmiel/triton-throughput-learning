@@ -871,3 +871,160 @@ shows *why* the three ic1 bars are flat: they sit at ~35% sm even when offered
 client saturating, and it is the reason the ic2/ic4 steps are credible — sm
 moves to ~82% exactly when throughput does. Read the two panels together; the
 throughput panel alone would invite the wrong conclusion.
+
+## 2026-11-05 (later): correction — the wifi link was never in the request path, so it cannot explain the flat ic1 numbers
+
+An earlier entry closes the stella sweep with:
+
+> "These numbers are a readiness proof, not a benchmark. They were taken over a
+> slow wifi ssh link, and the flat ~110 rps at ic1 across three different configs
+> is exactly the signature of a client-side ceiling. ... Re-run on the 1 Gb switch
+> before quoting any absolute rps."
+
+That paragraph is wrong and it will send a future reader chasing the network.
+Two separate mistakes in one sentence:
+
+**1. The ssh link never carried an inference request.** `sweep.sh` copies
+`loadgen.py` into the container and runs it there:
+
+```bash
+docker exec $CONTAINER python3 /tmp/loadgen.py "$conc" "$DUR"
+```
+
+The generator talks to Triton over `localhost` inside the container's network
+namespace. The ssh hop carries only the shell that issues `docker exec` and the
+few hundred bytes of summary text printed at the end of each run. It cannot cap
+throughput at 110 rps because it never sees a single embedding request. The same
+is true of `priorityload.py` in the co-tenancy sweep below. "Re-run on the 1 Gb
+switch" is therefore not the fix for the ic1 flatness — plugging into the switch
+will not move that number at all.
+
+**2. It was not a client-side ceiling either.** The *other* paragraph of that
+same entry had it right and this sentence contradicted it: at ic1 the GPU sits at
+~35% sm no matter how much load is offered, and conc=64 returns the same ~116 rps
+as conc=16 while p50 climbs 136 ms → 553 ms. A client limit cannot hold the GPU
+at 35% — it would leave the GPU *idle*, not stuck at a third. That signature is
+serialisation inside the python backend's `execute()` on a single instance: the
+queue grows (latency rises) but the one instance drains it one forward pass at a
+time (throughput flat). The ceiling is server-side, in the model instance, and
+that is exactly why `instance_group.count` is the lever that moves it (110 → 212
+→ 254 as sm goes 35% → 82%).
+
+**Why this matters.** The wrong diagnosis points at the wrong fix. Chasing the
+network wastes a session; the ic1 ceiling is answered by more instances, which
+the sweep already measured. The absolute ic1 number (~110 rps) is a real property
+of one python-backend instance, not a measurement artifact, so it is safe to
+quote with the ic1 caveat attached.
+
+**What would mislead.** The separate gigabit-client finding elsewhere in this log
+is genuine and does gate the *miniLM* ramp-up sweeps, where the client really is
+across a 100 Mbps link and the load generator runs on the client. Do not conflate
+the two setups: stella's `sweep.sh` and `priorityload.py` run in-container and are
+not network-bound; `ramp-up.py` against miniLM runs on the laptop and is.
+
+
+## 2026-11-05 (later): priority co-tenancy — priority does not move the cliff, it changes what happens past it
+
+**The question.** Production stella must hold 100 TPS on the search endpoint.
+Everything else the GPU can do should be spent on indexing, as long as indexing
+does not disturb that 100 TPS. The hope was a flat search-latency line while
+indexing load ramped to saturation.
+
+**The answer, up front: there is no flat line.** The GPU saturates at roughly
+100–110 total requests/second. Search alone at 100 TPS already sits at about
+90% of that. There is no spare capacity for indexing at all, so *any* indexing
+traffic pushes past saturation and search latency bends. Priority scheduling
+cannot manufacture capacity that is not there.
+
+What priority *does* buy is the shape of the failure. Without it, search
+throughput collapses and the tail runs away. With it, search holds its 100 TPS
+and the damage is paid by indexing. That is a real and useful difference — it is
+just not the flat line the question assumed.
+
+### Conditions
+
+RTX 3080 (10 GB), `stella400m` ONNX, `instance_group count: 4`,
+`max_batch_size: 16`, `preferred_batch_size: [16]`, `dynamic_batching` on.
+Generator `priorityload.py` running **inside** the container, 128 HTTP sender
+threads, search in-flight cap 48, indexing in-flight cap 72. Search payloads are
+short queries (~10 tokens) at a fixed 100 TPS offered. Indexing payloads are
+~512-token documents. Indexing ramps inside one run: 0, 8, 20, 40, 60, 80, 120
+rps offered, one step per 15 s, buckets 15 s wide, 105 s per arm. Two arms:
+`priority_levels: 2` with search at priority 1 and indexing at priority 2, and a
+control with no priority fields. Zero request errors in both arms.
+
+### Summary numbers
+
+| arm | search delivered | search p99 median | search p99 max | SLO 100 ms | index offered peak | index delivered | index alone (cal) |
+|---|---|---|---|---|---|---|---|
+| `no_priority` | 77.3 rps | 46.8 ms | 1410.3 ms | BREAKS | 120 | 35.6 rps | 80.2 rps |
+| `priority` | 95.4 rps | 759.7 ms | 852.2 ms | BREAKS | 122 | 30.8 rps | 81.2 rps |
+
+### Per-bucket search, the part that actually shows the effect
+
+| t (s) | index offered | control TPS | control p50 | control p99 | priority TPS | priority p50 | priority p99 |
+|---|---|---|---|---|---|---|---|
+| 0 | 8 | 100.1 | 14.4 | 16.2 | 100.1 | 14.5 | 16.7 |
+| 15 | 8 | 99.9 | 14.7 | 34.3 | 99.9 | 14.9 | 36.3 |
+| 30 | 20 | 100.1 | 20.7 | 38.2 | 100.1 | 20.7 | 40.3 |
+| 45 | 40 | 100.0 | 22.7 | 46.8 | 100.0 | 25.7 | 58.4 |
+| 60 | 60 | 99.9 | 1007.9 | 1344.9 | 99.9 | 527.7 | 838.9 |
+| 75 | 120 | **41.4** | 1185.9 | 1410.3 | **100.0** | 547.5 | 759.7 |
+
+Read the t=75 row. It is the whole result. Both arms are offered the same 220
+rps total. The control delivers 41.4 search rps — it loses more than half the
+search traffic. Priority delivers 100.0 search rps — it loses none. Both pay
+roughly a second of latency; priority pays about 40% less of it.
+
+### Why it behaves this way
+
+Triton's priority queue reorders *waiting requests*. When the GPU is saturated
+there is always a queue, so priority has something to reorder, and it always
+picks search. That is why search throughput is protected at t=75.
+
+It does not make the GPU faster. A search request that is dispatched first still
+joins a batch that is competing for the same four instances, and the batch it
+lands in is full of 512-token indexing documents. The latency cost is the batch
+composition and the queue ahead of it, and priority only shaves the queue part.
+Hence ~550 ms p50 instead of ~1190 ms: better, nowhere near the 15 ms idle
+figure.
+
+The cliff is at the same place in both arms, ~100–110 total rps offered
+(search 100 + indexing ~8–20 is fine; search 100 + indexing 60 is not). The
+grey dotted lines in the top panel of `priority-sweep.png` are total offered
+load, and both arms bend at the same total. Priority moves nothing about where
+the cliff is.
+
+### What would mislead
+
+**Do not quote these absolute rps as a capacity plan.** The generator is
+CPython threads with blocking `urllib` and 128 sender threads, running
+in-container. At the loudest steps it cannot actually offer 120 rps of
+512-token documents: at t=90 the control reports 31.9 delivered against 120
+offered with `cap_wait_max` of 11 s, which means requests were queuing *in the
+client* waiting for one of the 72 in-flight slots. Whether that ceiling is the
+in-flight cap, the 128 sender threads, or CPython itself, the client cannot tell
+us, and it is a different ceiling from the ic1 serialisation the correction
+above is about. The
+comparison between arms is still sound — same client, same payloads, same
+schedule — but "indexing capacity is 35 rps" is not established. Indexing alone
+calibrated at 80 rps, so the honest statement is "indexing capacity is somewhere
+between 30 and 80 rps once search is taking 100 TPS, and the client cannot tell
+us which."
+
+**The 100 ms SLO is not met by either arm and priority does not rescue it.** If
+the real requirement is 100 TPS *at* 100 ms, this GPU cannot co-host indexing at
+all. The options are: give search its own instance group or its own container,
+cap indexing to the ~8–20 rps region where the table shows search still at
+~40 ms p99, or accept a degraded-but-not-collapsed search under load. Priority
+is the right tool for the third option and the wrong tool for the first two.
+
+**Priority is invisible in the config and unprovable from the config.** It
+travels in the request body (`"parameters": {"priority": N}`), and Triton
+*clamps* an out-of-range priority instead of rejecting it, so a bad priority
+value returns HTTP 200 and silently behaves as unprioritised. `priority-probe.py`
+exists because of this: it is the only check that distinguishes "priority off"
+from "priority on but the queue is empty so there is nothing to reorder". See
+the two `preferred_batch_size` traps documented in the header of
+`priority-sweep.sh` — both of them produce a config that loads, a probe that
+reports ratio ≈ 1.0, and a graph that looks like priority does not work.

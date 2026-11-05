@@ -29,13 +29,17 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 # The three rows measured at instance_group count 1 all landed within 1% of
-# each other (110/117/116 rps) while GPU utilisation stayed pinned near 35%
-# regardless of how hard we pushed. That flat line is the signature of a
-# client-side ceiling over a slow wifi link, not a GPU limit -- which is why
-# the ic2/ic4 gains are believable (the GPU moved 35% -> 82% alongside them)
-# and why the absolute numbers are a readiness proof rather than a benchmark.
+# each other (110/117/116 rps) while GPU utilisation stayed pinned near 35%.
+# That flat line is NOT the wifi link: sweep.sh runs the load generator
+# *inside* the container with `docker exec`, so the laptop's NIC is nowhere in
+# the measurement path. It is the single python-backend instance serving
+# requests one at a time -- latency scales exactly linearly with concurrency
+# (8.98 ms at conc=1, 136 ms at 16, 553 ms at 64) while throughput does not
+# move at all, which is the signature of one serial service point of ~8.6 ms.
+# The GPU has headroom, which is why ic2/ic4 scale and why the gains are
+# believable (sm moved 35% -> 82% alongside them).
 CLIENT_CEILING_RPS = 116.0
-CEILING_LABEL = "client/link ceiling (~116 rps)\nic1 cannot exceed this"
+CEILING_LABEL = "ic1 serial-instance ceiling (~116 rps)\nnot the network: load runs in-container"
 
 VRAM_TOTAL_MB = 10240  # RTX 3080 10 GB
 
@@ -190,9 +194,10 @@ def main():
     fig.text(
         0.5,
         0.005,
-        "Measured over a slow wifi ssh link: the flat ~116 rps across all ic1 rows is a "
-        "client-side ceiling, not a GPU limit.\nic2/ic4 gains are real because sm utilisation "
-        "moved 35% -> 82% with them. Re-run wired on the 1 Gb switch for publishable numbers.",
+        "The flat ~116 rps across all ic1 rows is the single python-backend instance serving "
+        "requests serially, not the network -- loadgen runs inside the container.\nic2/ic4 "
+        "gains are real because sm utilisation moved 35% -> 82% with them. Absolute rps is "
+        "still unverified against a client-side ramp-up run, which IS network-bound.",
         ha="center",
         fontsize=8,
         style="italic",

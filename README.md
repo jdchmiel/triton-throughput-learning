@@ -150,9 +150,51 @@ throwaway CSV, so a clean clone can regenerate it:
 The three panels are the three questions the campaign asks. Throughput rises
 110 → 212 → 254 rps purely by adding model copies. Utilisation is the panel that
 makes those numbers trustworthy: the ic1 rows sit at ~35% sm no matter how much
-load is offered, so the flat ~116 rps across them is the wifi link and client,
-not the GPU — and the ic2/ic4 gains are real because sm jumps to ~82% alongside
+load is offered, so the flat ~116 rps across them is the single python-backend
+instance serving requests one at a time — not the GPU, and not the network
+either, since `sweep.sh` runs the load generator inside the container over
+`localhost`. The ic2/ic4 gains are real because sm jumps to ~82% alongside
 them. VRAM tops out at 4795 of 10240 MB, so memory is not what caps ic4.
+
+### Priority co-tenancy: holding 100 TPS for search while indexing saturates the rest
+
+Can one GPU serve a latency-sensitive search class at a fixed 100 TPS while a
+lower-priority indexing class soaks up whatever capacity is left? Triton can
+prioritise, but only if the config is written a particular way, and two
+`dynamic_batching` settings silently defeat it.
+
+```bash
+# on the host, after copying tools/{priority-sweep.sh,priorityload.py,
+# priority-probe.py} to /tmp and docker cp'ing the two .py files into the
+# container. Rewrites config.pbtxt and restores it on exit.
+bash /tmp/priority-sweep.sh
+```
+
+`priority-probe.py` is the gate. Priority is invisible in the config and Triton
+*clamps* an out-of-range request priority instead of rejecting it, so a broken
+setup returns HTTP 200 and behaves as unprioritised. The probe measures whether
+priority actually reorders a queue, and it is the only check that tells "priority
+off" apart from "priority on but the queue is empty so there is nothing to
+reorder". Read the header of `priority-sweep.sh` before changing
+`preferred_batch_size` — both traps there produce a config that loads, a probe
+that reports no effect, and a graph that looks like priority does not work.
+
+![priority sweep](./stella-results/priority-sweep.png)
+
+Like the sweep figure, this is reproducible from a clean clone — the raw bucket
+JSONL is committed beside it:
+
+```bash
+.venv/bin/python plot_priority_sweep.py stella-results/priority-sweep.jsonl \
+  stella-results/priority-sweep.png
+```
+
+The top panel is the answer: both arms' search p99 on one log axis, with total
+offered load behind them. Both arms bend at the same total (~100–110 rps),
+because priority does not create capacity. What it changes is the far side of the
+cliff — at the loudest step the control delivers 41.4 search rps and priority
+delivers 100.0. Neither holds a 100 ms SLO. Full numbers and the honest caveats
+are in the 2026-11-05 co-tenancy entry in `PROGRESS_LOG.md`.
 
 ## TODO things to test out
 
@@ -232,7 +274,22 @@ measurements behind this ordering):
 - Try a single model instead of two at a time. Use `campaign.py --model
   miniLM-onnx --ramp-endpoint onnx`, which already benchmarks one model in
   isolation; unloading the other is a small addition if the noise matters.
-- Hold the priority-1 model at 100 requests/second while increasing the lower
-  priority model, and check the priority-1 p95 stays flat. This needs open-loop
-  load (a fixed offered rate), which the closed-loop ramp cannot express — see
-  the "Add a campaign type" note in `program.md`.
+- ~~Hold the priority-1 model at 100 requests/second while increasing the lower
+  priority model, and check the priority-1 p95 stays flat.~~ **Done, and the
+  answer is no — it does not stay flat.** The GPU saturates at ~100–110 total
+  rps, so 100 TPS of search leaves nothing for indexing and *any* indexing load
+  bends search latency. Priority converts a throughput collapse (41.4 rps
+  delivered) into graceful degradation (100.0 held) and roughly halves the tail,
+  but it cannot manufacture capacity. See the co-tenancy section above and the
+  2026-11-05 entry in `PROGRESS_LOG.md`. Follow-ups worth running: give search
+  its own instance group (or container) so the two classes stop competing for the
+  same four instances, and fix the generator so the top of the ramp can actually
+  offer its target rate — see the next bullet.
+- **Make the load generator able to offer its target rate.** Both
+  `loadgen.py` and `priorityload.py` are CPython threads doing blocking
+  `urllib` calls. At the loudest co-tenancy steps the client could not offer
+  120 rps of 512-token documents (31.9 delivered against 120 offered, with 11 s
+  spent waiting for an in-flight slot), so "indexing capacity" is only bounded
+  to somewhere between 30 and 80 rps. Rewrite with `multiprocessing` or
+  `asyncio` + `httpx`, or use a real load tool, then re-run the co-tenancy ramp
+  to pin down the indexing headroom.

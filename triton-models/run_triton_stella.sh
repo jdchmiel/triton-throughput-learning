@@ -13,9 +13,14 @@
 # of them. --model-control-mode=explicit is what lets the sweep rewrite
 # config.pbtxt and POST .../load between rows without restarting the server.
 #
-# --http-thread-count=16: the HTTP worker pool defaults to 8, and each
-# in-flight request occupies one thread, so the default silently caps
-# concurrency below what an instance_group.count sweep is trying to measure.
+# --http-thread-count: the HTTP worker pool defaults to 8, and each in-flight
+# request occupies one thread, so the default silently caps concurrency below
+# what an instance_group.count sweep is trying to measure. Override with
+# HTTP_THREADS when a run needs more in-flight requests than 16 -- the
+# co-tenancy sweep offers 100 TPS of search on top of a heavy indexing load,
+# which is well over 16 concurrent requests, and a starved worker pool would
+# show up as queueing that belongs to the HTTP layer rather than the model.
+HTTP_THREADS=${HTTP_THREADS:-16}
 #
 # --gpus all is required: the model is KIND_GPU and the python backend stub
 # inherits the container's device visibility.
@@ -32,10 +37,15 @@ COMMON_ARGS="tritonserver --model-repository=/opt/ml/model \
   --model-control-mode=explicit \
   --load-model=stella400m \
   --strict-model-config=false \
-  --http-thread-count=16 \
+  --http-thread-count=$HTTP_THREADS \
   --rate-limit=execution_count --log-verbose=1"
 
-DOCKER_BASE="docker run --gpus all --rm \
+# Note: --rm is deliberately NOT in the base. A crash during model load (for
+# example --http-thread-count=256, which segfaults Triton at exit 139) would
+# otherwise delete the container before anyone could read its logs, and the
+# readiness loop would report "No such container" instead of the real cause.
+# --stop and the pre-clean below do the removal instead.
+DOCKER_BASE="docker run --gpus all \
   --name $CONTAINER \
   -p 8000:8000 -p 8001:8001 -p 8002:8002 \
   -p 8080:8080 -p 8081:8081 -p 8082:8082 \
@@ -47,6 +57,7 @@ if [ "$1" = "--bg" ]; then
   # Detached so a sweep can drive it over ssh. -d returns as soon as the
   # container starts, which is NOT the same as the model being ready; callers
   # must poll /v2/models/stella400m/ready (stella takes ~25s to load).
+  docker rm -f $CONTAINER >/dev/null 2>&1
   $DOCKER_BASE -d $IMAGE $COMMON_ARGS
   echo "waiting for stella400m to become ready..."
   for i in $(seq 1 60); do
@@ -56,8 +67,12 @@ if [ "$1" = "--bg" ]; then
     fi
     sleep 1
   done
-  echo "TIMEOUT waiting for ready; last log lines:"
-  docker logs --tail 30 $CONTAINER
+  # Distinguish "still loading" from "crashed": a dead container will never
+  # become ready, and its exit code is the actual diagnosis.
+  echo "TIMEOUT waiting for ready"
+  docker inspect $CONTAINER --format "state={{.State.Status}} exit={{.State.ExitCode}} oom={{.State.OOMKilled}}" 2>/dev/null
+  echo "--- last log lines ---"
+  docker logs --tail 30 $CONTAINER 2>&1
   exit 1
 fi
 
