@@ -133,6 +133,27 @@ Rows are `label:batching:count:concurrency`. Batch size comes from Triton's own
 counters, never from the config. See the 2026-11-05 `PROGRESS_LOG.md` entry for
 results and for why the ic1 ceiling is not the GPU.
 
+### The sweep, plotted
+
+`stella-results/stella-sweep.png` shows throughput, GPU utilisation and VRAM for
+all seven measured rows:
+
+![stella sweep](./stella-results/stella-sweep.png)
+
+It is generated from the markdown table in `PROGRESS_LOG.md`, not from a
+throwaway CSV, so a clean clone can regenerate it:
+
+```bash
+.venv/bin/python plot_stella_sweep.py --out stella-results/stella-sweep.png
+```
+
+The three panels are the three questions the campaign asks. Throughput rises
+110 → 212 → 254 rps purely by adding model copies. Utilisation is the panel that
+makes those numbers trustworthy: the ic1 rows sit at ~35% sm no matter how much
+load is offered, so the flat ~116 rps across them is the wifi link and client,
+not the GPU — and the ic2/ic4 gains are real because sm jumps to ~82% alongside
+them. VRAM tops out at 4795 of 10240 MB, so memory is not what caps ic4.
+
 ## TODO things to test out
 
 Covered by `campaign.py` (it sweeps these automatically):
