@@ -70,10 +70,12 @@ Results land in `experiments/<campaign-timestamp>/exp-<NN>_<peakRps>rps/`.
 ## Stella 400M (single-model server)
 
 `stella400m` is the 400M-parameter Stella encoder (`NovaSearch/stella_en_400M_v5`)
-behind the Triton python backend: text in, unit-length 1024-d vector out. It is
-the encoder half of the `intent-replica` shape at 18x the size, so the GPU has
-real work to do. Read the docstring in `triton-models/stella400m/1/model.py`
-before touching the load path — it needs two transformers-5 shims and both fail
+behind the Triton python backend: text in, unit-length 1024-d vector out. That is
+the entire contract, and it matches production — the service returns embeddings.
+No corpus, no cosine similarity, no retrieval anywhere in this model. It sits at
+18x the size of `miniLM-512`, so unlike the smaller models the GPU actually has
+work to do. Read the docstring in `triton-models/stella400m/1/model.py` before
+touching the load path — it needs two transformers-5 shims and both fail
 *silently* (the model returns unit-length vectors that are nearly identical for
 every input).
 
@@ -82,33 +84,41 @@ every input).
 triton-models/run_triton_stella.sh --bg
 triton-models/run_triton_stella.sh --stop
 
-# from anywhere: freeform, corpus-side (--passage skips the instruct prompt),
-# or the ranking gate
+# from anywhere: freeform, passage-side (--passage skips the instruct prompt),
+# or the regression gate
 ./test-stella.sh "reset my password"
 ./test-stella.sh --passage "Paris is the capital of France."
 HOST=http://localhost:8000 ./test-stella.sh --check   # run this ON the host
 ```
 
-`--check` is a ranking test, not a shape test, because the two ways this model
-breaks (uninitialised rope buffers, the instruct prompt applied to both sides)
-are invisible in the output shape. It asserts a similarity gap > 0.2 between a
-matching and an unrelated passage.
+`--check` computes similarity *in the test script*, not in the service, because
+ranking is the only way to tell a good embedding from a broken one. The two ways
+this model breaks (uninitialised rope buffers, the instruct prompt applied to
+both sides) are invisible in the output shape. It asserts a similarity gap > 0.2
+between a matching and an unrelated passage.
 
-The repo holds `model.py`, `config.pbtxt` and the sweep tools; it does **not**
-hold the checkpoint. `1/model.py` loads from its own directory, so the host
-directory needs the HuggingFace files beside it:
+### What's in the repo
+
+This repo is the source of truth for the deployment. Vendored under
+`triton-models/stella400m/1/`: `model.py`, the checkpoint's `configuration.py`
+and `modeling.py` (its `config.json` `auto_map` points at them), `config.json`,
+`tokenizer.json`, `tokenizer_config.json`, `vocab.txt`, `1_Pooling/config.json`
+and `2_Dense_1024/config.json`. All MIT-licensed upstream code, byte-identical
+to the checkpoint.
+
+The only thing not committed is the 1.7 GB `model.safetensors`:
 
 ```bash
-# on the triton host
+# on the triton host — the one download a rebuild needs
 huggingface-cli download NovaSearch/stella_en_400M_v5 \
-  --local-dir /AI/models/triton/stella400m/1
+  --local-dir /AI/models/triton/stella400m/1 \
+  --include "*.safetensors"
 ```
 
-`configuration.py` and `modeling.py` are required (the checkpoint's `auto_map`
-points at them), plus `2_Dense_1024/` for the output head. Do not "fix"
-`config.json` to drop `use_memory_efficient_attention` / `unpad_inputs` —
-`model.py` already overrides both to `False`, because they need xformers, which
-the borrowed miniLM env does not have.
+`model.py` loads from its own directory, so the weights go beside the vendored
+files. Do not "fix" `config.json` to drop `use_memory_efficient_attention` /
+`unpad_inputs` — `model.py` already overrides both to `False`, because they need
+xformers, which the borrowed miniLM env does not have.
 
 The sweep is deliberately separate from `campaign.py` — it rewrites
 `config.pbtxt` and hot-reloads through the repository API:

@@ -778,3 +778,80 @@ cannot cause. Re-run on the 1 Gb switch before quoting any absolute rps.
 - Long remote sweeps must be `setsid nohup`'d to a file. One run lost its output
   to `Connection reset by peer` mid-sweep; the server was fine and the results
   were simply gone.
+
+---
+
+## 2026-11-05 (later): stella is an embedding service, and the repo is the source of truth
+
+Correction to the entry above. I had framed `stella400m` as "the encoder half of
+the intent-replica shape" and suggested pairing it with a corpus. That was my
+inference from the employer's *application*, and it was wrong. Production stella
+returns embeddings. It does no cosine similarity and does not involve a corpus
+in any way. The corpus/similarity work belongs to `intent-replica`, which is a
+separate model reproducing a different service.
+
+Nothing about the measurements changes — the encoder was always the thing being
+benchmarked, and the sweep numbers are unaffected. What changes is what we should
+*not* build: there is no 400M retrieval pipeline to assemble here. Beads issue
+`triton-throughput-tester-ugm` was closed for having a false premise rather than
+rewritten, so the wrong idea stays auditable.
+
+### Vendored the checkpoint into the repo
+
+"Keep all the work in this repo as a source of truth" matters, because until now
+the deployment was **not rebuildable from a clean clone**. `configuration.py` and
+`modeling.py` existed only on the box, and the checkpoint's `config.json`
+`auto_map` points at them by name — without them `AutoModel.from_pretrained`
+cannot build the model at all. Now vendored under `triton-models/stella400m/1/`:
+
+| file | why it's needed |
+|---|---|
+| `modeling.py` (57 KB) | `auto_map` → `modeling.NewModel`; also where the rope classes and the `get_extended_attention_mask` call site live |
+| `configuration.py` (7 KB) | `auto_map` → `configuration.NewConfig` |
+| `config.json` | architecture + the `use_memory_efficient_attention`/`unpad_inputs` traps |
+| `tokenizer.json`, `tokenizer_config.json`, `vocab.txt` | tokenisation |
+| `1_Pooling/config.json` | documents mean-pool, no CLS |
+| `2_Dense_1024/config.json` | the 1024→1024 output head shape |
+
+Every file was copied from the box and verified with `sha256sum` on both sides —
+all six matched byte-for-byte, so the repo holds the exact code that was running,
+not a re-download that might drift. Upstream is `license:mit` (confirmed via the
+HF model API), so committing it is fine. Total 1.1 MB.
+
+Excluded deliberately: `model.safetensors` (1.7 GB, doesn't belong in git) and
+`2_Dense/` (the 512-d head; `model.py` uses `2_Dense_1024`). A rebuild is now one
+download instead of a whole-checkpoint download:
+
+```bash
+huggingface-cli download NovaSearch/stella_en_400M_v5 \
+  --local-dir /AI/models/triton/stella400m/1 --include "*.safetensors"
+```
+
+### Verified the reframing was documentation-only
+
+Comment-only edits to `config.pbtxt` still carry real risk (the file is a
+protobuf text format, and `sweep.sh` rewrites it wholesale), so rather than
+assume, I started the server, ran the gate, and shut it down again:
+
+```
+READY after 23s
+dims  : 1024  (unit norm ok)
+match : 0.7587   Paris is the capital and largest city of France.
+apart : 0.1809   My cat likes to sleep on the couch all day.
+gap   : 0.5778
+PASS
+```
+
+Identical to the pre-edit numbers, which is the point — a reworded comment must
+not move a single float. Freeform and `--passage` modes both returned norm-1.0
+vectors. Server stopped and confirmed down: no triton container, port 8000 dead,
+GPU 15 MiB / 0%.
+
+### New open question: does production apply the instruct prompt?
+
+Filed as `triton-throughput-tester-8lc`. This is the one remaining way this
+deployment could be silently unrepresentative. Stella is asymmetric, and
+`PROMPT_MODE=always` prepends the instruct prompt server-side, which changes the
+vector. If the employer's service encodes *without* a prompt, we are benchmarking
+a slightly different workload and the fix is a one-line config change plus a
+re-sweep. It needs a fact from inside their network, not an experiment here.

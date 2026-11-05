@@ -1,8 +1,9 @@
 #!/bin/bash
 # Stella 400M on Triton (python backend): text in, unit-length 1024-d embedding out.
 #
-# This is the encoder half of the production intent shape. The corpus itself
-# lives in intent-replica; stella400m just turns a string into a vector.
+# That is the whole service -- the same contract production has. No corpus and
+# no similarity scoring live in this model; this script only proves the encoder
+# returns a sane vector.
 #
 # Stella is an ASYMMETRIC model: the instruct prompt goes on queries and must
 # NOT be used on passages. The server prepends it by default (PROMPT_MODE=always
@@ -29,9 +30,10 @@ infer() {
 }
 
 if [ "$1" = "--check" ]; then
-  # Stella is only worth running if it can tell a matching passage from an
-  # unrelated one. Both bugs that break that here (uninitialised rope buffers
-  # under transformers 5, a mis-applied instruct prompt) are silent: the model
+  # The service itself never compares anything, but the test has to, because
+  # the only way to tell a good embedding from a broken one is by ranking.
+  # Both bugs that break this model here (uninitialised rope buffers under
+  # transformers 5, a mis-applied instruct prompt) are silent: the model
   # still returns unit-length vectors, they are just nearly identical for every
   # input. So the gate is a ranking test, not a shape test.
   QUERY="What is the capital of France?"

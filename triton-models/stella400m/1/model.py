@@ -1,4 +1,8 @@
-"""Triton python-backend embedding model: text in, unit-length 1024-d vector out.
+"""Triton python-backend embedding service: text in, unit-length 1024-d vector out.
+
+This is the whole contract. Production stella returns embeddings -- no corpus,
+no cosine similarity, no retrieval. Nothing in this file scores or compares
+anything; it encodes text and hands back the vector.
 
 Pipeline (NovaSearch/stella_en_400M_v5, the 400M Stella encoder):
 
@@ -7,9 +11,10 @@ Pipeline (NovaSearch/stella_en_400M_v5, the 400M Stella encoder):
                  -> L2 normalise -> EMBEDDING [1024] FP32
 
 The instruct prompt is applied server-side (PROMPT_MODE=always by default) so
-callers send bare text. Stella is asymmetric: the prompt belongs on queries
-and must not be used when indexing the corpus. Either set PROMPT_MODE=never on
-the indexing model, or send the optional USE_PROMPT input per request.
+callers send bare text. Stella is asymmetric: the prompt belongs on the query
+side and must not be applied on the passage side. Either set PROMPT_MODE=never
+for a passage-encoding deployment, or send the optional USE_PROMPT input per
+request. Vectors from the two modes are not comparable to each other.
 
 Two repairs run after from_pretrained(). Both are transformers-5.x shims for
 this 2024-era remote code, and both fail silently if removed -- the model

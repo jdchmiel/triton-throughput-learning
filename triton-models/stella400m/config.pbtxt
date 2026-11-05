@@ -1,8 +1,11 @@
-# Stella 400M (NovaSearch/stella_en_400M_v5) embedding encoder.
+# Stella 400M (NovaSearch/stella_en_400M_v5) embedding service.
 #
-# Text in, unit-length 1024-d vector out. This is the encoder half of the
-# production intent shape -- pair it with intent-replica to get the full
-# utterance -> corpus-match pipeline at 400M scale.
+# Text in, unit-length 1024-d vector out, and nothing else. This matches
+# production: the service returns embeddings. There is no corpus and no
+# similarity scoring here -- whatever consumes the vectors is the caller's job.
+#
+# Everything needed to serve this model is vendored in this repo except the
+# 1.7 GB model.safetensors, which must be downloaded into 1/ (see README).
 #
 # The python backend has no torch in the Triton image, so it borrows the
 # existing miniLM virtualenv rather than shipping a second 3 GB copy. That env
@@ -12,7 +15,7 @@
 # Sweep knobs live in parameters so a campaign can rewrite them without
 # touching model.py:
 #   DTYPE               float16 (default) | float32
-#   PROMPT_MODE         always (queries) | never (corpus indexing)
+#   PROMPT_MODE         always (query side, default) | never (passage side)
 #   ATTN_IMPLEMENTATION "" (eager, what the checkpoint was trained with) | sdpa
 #   MAX_LENGTH          tokenizer truncation cap
 #   TORCH_THREADS       pins the CPU thread pool for multi-instance runs
@@ -43,10 +46,11 @@ parameters: {
   value: { string_value: "float16" }
 }
 
-# Stella is asymmetric: the instruct prompt goes on queries only. A corpus
-# index built with PROMPT_MODE=always must not be compared against prompts
-# applied at query time. Deployments that index separately want a second
-# model entry pointing at this same directory with PROMPT_MODE=never.
+# Stella is asymmetric: the instruct prompt belongs on the query side only.
+# This deployment applies it by default; a caller that needs passage-side
+# encoding sends USE_PROMPT=0 per request. Vectors encoded with and without the
+# prompt are not comparable to each other, so whichever side a caller is
+# encoding, it has to stay consistent on that side.
 parameters: {
   key: "PROMPT_MODE"
   value: { string_value: "always" }
